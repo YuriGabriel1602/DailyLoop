@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+/* Base do sistema */
+:root {
+  background-color: #050505;
+  color: white;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #050505;
+  overflow: hidden;
+}
