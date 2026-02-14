@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import "./App.css";
 import NeuralHandshake from "./components/NeuralHandshake";
 import { Dashboard } from "./components/Dashboard";
+import { CommandMenu } from './components/CommandMenu';
 
 function App() {
   // Estado que controla se o usuário já fez o "login" neural
@@ -17,6 +18,8 @@ function App() {
   return (
     // O contêiner principal do aplicativo
     <div className="h-screen w-screen overflow-hidden bg-[#050505] text-white selection:bg-blue-500/30">
+
+      {isAuthenticated && <CommandMenu />}
       
       {/* AnimatePresence gerencia as animações de entrada e saída dos componentes */}
       <AnimatePresence mode="wait">
