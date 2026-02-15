@@ -227,7 +227,7 @@ const HomeView = ({ mission, setMission }: HomeViewProps) => {
                     </h1>
                     <form onSubmit={handleSetMission} className="relative w-full max-w-xl">
                         <input autoFocus type="text" value={localInput} onChange={(e) => setLocalInput(e.target.value)} placeholder="Digite para iniciar o ciclo..." className="w-full bg-white/10 border border-white/20 rounded-2xl py-5 px-6 text-xl text-white focus:outline-none focus:border-blue-500/50 focus:bg-white/15 transition-all placeholder:text-white/30" />
-                        <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-white text-black rounded-xl hover:scale-105 transition-transform"><ArrowRight size={20} /></button>
+                        <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-white text-black rounded-xl hover:scale-105 transition-transform"><ArrowRight size={20}/></button>
                     </form>
                  </motion.div>
                ) : (
@@ -518,25 +518,41 @@ const PrometheusDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return;
     const userMsg = input;
     setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
     setInput('');
     setLoading(true);
 
-    // Simula resposta da IA
-    setTimeout(() => {
-      const responses = [
-        "Entendido. Analisando seus padrões de produtividade...",
-        "Essa é uma excelente estratégia. Recomendo focar nisso pelos próximos 45 minutos.",
-        "Processei sua solicitação. Seus dados financeiros estão estáveis.",
-        "Estou aqui para ajudar. O que mais você precisa?"
-      ];
-      const randomResp = responses[Math.floor(Math.random() * responses.length)];
-      setMessages(prev => [...prev, { role: 'ai', content: randomResp }]);
-      setLoading(false);
-    }, 1500);
+    // Tenta conectar ao Backend Real
+    try {
+        const response = await fetch('http://127.0.0.1:8000/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: userMsg })
+        });
+        
+        if(response.ok) {
+            const data = await response.json();
+            setMessages(prev => [...prev, { role: 'ai', content: data.response }]);
+        } else {
+            throw new Error("Falha na conexão");
+        }
+    } catch (e) {
+        // Fallback: Simula resposta da IA se backend estiver offline
+        setTimeout(() => {
+          const responses = [
+            "⚠️ Backend Offline. [Simulação]: Entendido. Analisando seus padrões...",
+            "⚠️ Backend Offline. [Simulação]: Recomendo focar nisso pelos próximos 45 minutos.",
+            "⚠️ Backend Offline. [Simulação]: Processei sua solicitação localmente."
+          ];
+          const randomResp = responses[Math.floor(Math.random() * responses.length)];
+          setMessages(prev => [...prev, { role: 'ai', content: randomResp }]);
+        }, 1500);
+    } finally {
+        setLoading(false);
+    }
   };
 
   return (
