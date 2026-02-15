@@ -1,0 +1,24 @@
+fastapi
+uvicorn
+requests
+SQLAlchemy
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart
+bcrypt==3.2.0
+
+# IA
+google-generativeai
+google-api-python-client
+
+# Config
+python-dotenv
+
+# Música
+spotipy
+
+# Agendamento Inteligente
+dateparser
+
+# HTTP Client (Necessário para Weather)
+httpx

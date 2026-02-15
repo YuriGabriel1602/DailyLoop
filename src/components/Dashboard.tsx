@@ -81,51 +81,25 @@ const SmartGreeting = () => {
   );
 };
 
-// --- COMPONENTE: GAVETA PROMETHEUS (CHAT) ---
+// --- COMPONENTE: GAVETA PROMETHEUS ---
 const PrometheusDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
   return (
     <AnimatePresence>
       {isOpen && (
         <>
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            onClick={onClose} className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
-          />
-          <motion.div
-            initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-            transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed top-2 bottom-2 right-2 w-[400px] max-w-[90vw] bg-[#0f0f11] border border-[#2d2d30] rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden"
-          >
-            <div className="flex items-center justify-between p-4 border-b border-white/5 bg-gradient-to-r from-[#1a1a1d] to-[#0f0f11]">
-              <div className="flex items-center gap-2">
-                <Bot className="text-purple-500" size={20} />
-                <span className="font-semibold text-gray-200 tracking-tight">PROMETHEUS</span>
-              </div>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" />
+          <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: "spring", damping: 30, stiffness: 300 }} className="fixed top-2 bottom-2 right-2 w-[400px] max-w-[90vw] bg-[#0f0f11] border border-[#2d2d30] rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-white/5 bg-[#1a1a1d]">
+              <div className="flex items-center gap-2"><Bot className="text-purple-500" size={20} /><span className="font-semibold text-gray-200 uppercase tracking-tighter">Prometheus</span></div>
               <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full text-gray-400 hover:text-white transition-colors"><X size={18} /></button>
             </div>
-            
             <div className="flex-1 p-4 space-y-6 overflow-y-auto">
                <div className="flex gap-4">
-                <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center shrink-0 border border-purple-500/30">
-                  <Bot size={16} className="text-purple-400" />
-                </div>
-                <div className="space-y-1">
-                  <div className="p-3 bg-[#1a1a1d] rounded-2xl rounded-tl-none border border-white/5 text-sm text-gray-300 shadow-sm">
-                    Sistemas online. Aguardando input tático.
-                  </div>
-                </div>
+                <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center shrink-0"><Bot size={16} className="text-purple-400" /></div>
+                <div className="p-3 bg-[#1a1a1d] rounded-2xl rounded-tl-none text-sm text-gray-300">Sistemas online. Aguardando input tático.</div>
               </div>
             </div>
-
-            <div className="p-4 border-t border-white/5 bg-[#0a0a0b]">
-              <div className="relative group">
-                <input 
-                  type="text" placeholder="Comando..." 
-                  className="w-full bg-[#151516] border border-white/10 rounded-xl py-3 pl-4 pr-10 text-sm text-white focus:outline-none focus:border-purple-500/50 transition-all group-hover:border-white/20"
-                />
-                <button className="absolute right-2 top-2.5 p-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white transition-colors shadow-lg shadow-purple-900/20"><ArrowRight size={14} /></button>
-              </div>
-            </div>
+            <div className="p-4 bg-[#0a0a0b]"><input type="text" placeholder="Comando..." className="w-full bg-[#151516] border border-white/10 rounded-xl py-3 px-4 text-sm text-white focus:outline-none" /></div>
           </motion.div>
         </>
       )}
