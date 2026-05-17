@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "system",
-  "version": "0.1.0",
-  "identifier": "com.dailyloop.v2",
+  "productName": "DailyLoop",
+  "version": "0.2.0",
+  "identifier": "com.dailyloop.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,13 +12,15 @@
   "app": {
     "windows": [
       {
-        "title": "system",
-        "width": 800,
-        "height": 600
+        "title": "DailyLoop",
+        "width": 1180,
+        "height": 760,
+        "minWidth": 960,
+        "minHeight": 640
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://images.unsplash.com https://i.scdn.co https://i.ytimg.com; connect-src 'self' http://127.0.0.1:8000 http://localhost:8000 https://api.open-meteo.com"
     }
   },
   "bundle": {

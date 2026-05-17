@@ -1,54 +1,38 @@
-# Importação atualizada para evitar o Warning de depreciação
 import google.generativeai as genai
-import os
-from dotenv import load_dotenv
-from pathlib import Path
 
-# Carrega as variáveis de ambiente do ficheiro .env
-env_path = Path(__file__).parent / ".env"
-load_dotenv(dotenv_path=env_path)
+from settings import settings
 
-# Tenta capturar a chave de diferentes variáveis comuns
-api_key = os.getenv("API_KEY_GEMINI") or os.getenv("GEMINI_API_KEY")
-
-if not api_key:
-    print("❌ AVISO: Chave API do Gemini não encontrada no .env.")
+if settings.gemini_api_key:
+    genai.configure(api_key=settings.gemini_api_key)
 else:
-    genai.configure(api_key=api_key)
-    print(f"✅ Chave API Carregada: {api_key[:5]}...")
+    print("Gemini API key not configured. Prometheus will answer in offline mode.")
 
-# Definição da Personalidade do PROMETHEUS
 SYSTEM_PROMPT = """
-Você é o PROMETHEUS, o núcleo de inteligência do DailyLoop OS.
-SUA MISSÃO: Atuar como um Co-Piloto de Alta Performance (Nível Executivo/Estratégico).
+Voce e o PROMETHEUS, o nucleo de inteligencia do DailyLoop.
 
-DIRETRIZES DE PERSONALIDADE:
-1. Sofisticado e Direto: Não use gírias, mas não seja robótico. Fale como um especialista.
-2. Proativo: Não apenas responda, sugira o próximo passo lógico.
-3. Sem "Roleplay" de Máquina: Fale naturalmente como uma extensão da mente do usuário.
-4. Formatação Visual: Use Markdown (negrito, listas, tabelas) para clareza extrema.
+Missao: atuar como um copiloto de alta performance, ajudando o usuario a transformar objetivos em proximas acoes claras.
 
-OBJETIVO: Ajudar o usuário a atingir 100% de produtividade e clareza mental.
+Diretrizes:
+1. Seja direto, util e estrategico.
+2. Nao invente dados pessoais nem finja ter acesso a sistemas que nao foram integrados.
+3. Quando faltar contexto, assuma pouco e sugira o proximo passo mais seguro.
+4. Use Markdown curto para clareza.
 """
 
-# Função RENOMEADA para coincidir com o que o main.py espera
+
 def ask_prometheus(prompt: str) -> str:
-    """
-    Interface principal de comunicação com a IA.
-    Envia o prompt do usuário junto com as diretrizes do sistema.
-    """
-    if not api_key:
-        return "Erro: Chave API ausente no servidor backend."
-    
+    clean_prompt = prompt.strip()
+    if not clean_prompt:
+        return "Me diga qual decisao ou tarefa voce quer organizar agora."
+
+    if not settings.gemini_api_key:
+        return "Prometheus esta em modo offline porque a chave Gemini nao foi configurada no backend."
+
     try:
-        # Usando o modelo gemini-2.5-flash para velocidade e eficiência
-        model = genai.GenerativeModel('gemini-2.5-flash')
-        
-        full_prompt = f"{SYSTEM_PROMPT}\n\nUsuário: {prompt}"
-        response = model.generate_content(full_prompt)
-        
-        return response.text.strip()
-        
-    except Exception as e:
-        print(f"🔴 ERRO NA COMUNICAÇÃO COM GEMINI: {e}")
-        return "O núcleo de IA está processando em modo offline. Tente novamente em breve."
+        model = genai.GenerativeModel(settings.gemini_model)
+        response = model.generate_content(f"{SYSTEM_PROMPT}\n\nUsuario: {clean_prompt}")
+        text = getattr(response, "text", "").strip()
+        return text or "Recebi sua mensagem, mas a IA retornou uma resposta vazia."
+    except Exception as exc:
+        print(f"Gemini communication error: {exc}")
+        return "O nucleo de IA ficou indisponivel por alguns instantes. Tente novamente em breve."
