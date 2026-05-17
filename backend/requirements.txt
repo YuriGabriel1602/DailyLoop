@@ -1,24 +1,21 @@
 fastapi
-uvicorn
+uvicorn[standard]
 requests
 SQLAlchemy
+sqlmodel
 passlib[bcrypt]
 python-jose[cryptography]
 python-multipart
 bcrypt==3.2.0
 
-# IA
+# AI and external providers
 google-generativeai
 google-api-python-client
-
-# Config
-python-dotenv
-
-# Música
 spotipy
 
-# Agendamento Inteligente
+# Config and scheduling
+python-dotenv
 dateparser
 
-# HTTP Client (Necessário para Weather)
+# HTTP client
 httpx
