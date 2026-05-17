@@ -1,11 +1,13 @@
 {
-  "name": "system",
+  "name": "dailyloop",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "dev:backend": "cd backend && uvicorn main:app --reload",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && vite build",
     "preview": "vite preview",
     "tauri": "tauri"
   },
