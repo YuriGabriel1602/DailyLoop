@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Logo } from "@/components/Logo";
 import { LiveConsole } from "./LiveConsole";
@@ -21,7 +22,9 @@ export function AuthLayout({ children }: { children: ReactNode }) {
           style={{ background: "radial-gradient(circle at 15% 10%, color-mix(in oklch, var(--primary) 25%, transparent), transparent 55%)" }}
         />
 
-        <Logo className="relative z-10" />
+        <Link to="/welcome" className="relative z-10 w-fit">
+          <Logo />
+        </Link>
 
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="relative z-10 space-y-7">
           <LiveConsole />
@@ -36,9 +39,9 @@ export function AuthLayout({ children }: { children: ReactNode }) {
 
       <section className="flex items-center justify-center bg-background px-6 py-12 sm:px-10">
         <div className="w-full max-w-sm">
-          <div className="mb-8 flex justify-center lg:hidden">
+          <Link to="/welcome" className="mb-8 flex justify-center lg:hidden">
             <Logo />
-          </div>
+          </Link>
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
             {children}
           </motion.div>

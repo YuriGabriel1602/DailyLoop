@@ -7,6 +7,7 @@ import RegisterPage from "./pages/auth/RegisterPage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import VerifyPhonePage from "./pages/auth/VerifyPhonePage";
+import LandingPage from "./pages/LandingPage";
 import HomePage from "./pages/HomePage";
 import TasksPage from "./pages/TasksPage";
 import FinancePage from "./pages/FinancePage";
@@ -43,6 +44,7 @@ function App() {
       <Toaster richColors position="top-center" />
       <BrowserRouter>
         <Routes>
+          <Route path="/welcome" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
