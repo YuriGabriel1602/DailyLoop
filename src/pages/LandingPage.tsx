@@ -109,7 +109,7 @@ function Hero() {
       <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-6 py-20 sm:px-10 sm:py-28 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10">
         <div>
           <p className="font-mono text-[13px] text-muted-foreground">
-            // assistente pessoal · <b className="font-medium text-primary">tarefas, finanças e WhatsApp</b>
+            // assistente pessoal · <b className="font-medium text-primary">tarefas, finanças e IA</b>
           </p>
           <h1 className="mt-5 text-[clamp(36px,6.5vw,68px)] leading-[0.98] font-extrabold tracking-tight">
             Seu dia inteiro,<br className="hidden sm:block" /> organizado <span className="text-primary">num só lugar.</span>
@@ -129,7 +129,7 @@ function Hero() {
           <div className="mt-8 flex flex-wrap gap-x-5 gap-y-2 font-mono text-xs text-muted-foreground">
             <span className="inline-flex items-center"><span className="mr-2 size-1.5 rounded-full bg-primary" />grátis pra começar</span>
             <span>· dados isolados por conta</span>
-            <span>· WhatsApp verificado por código</span>
+            <span>· notificações por email inclusas</span>
           </div>
         </div>
         <HeroPreviewCard />
@@ -145,7 +145,7 @@ const FEATURES = [
   { tag: "tarefas", icon: ListTodo, title: "Tarefas com prazo", desc: "Crie tarefas com data e hora — o Prometheus lembra você no WhatsApp ou email antes do prazo vencer." },
   { tag: "finanças", icon: Wallet, title: "Finanças de verdade", desc: "Categorização automática por IA, importação de extrato CSV/OFX e orçamento por categoria, sem planilha." },
   { tag: "prometheus", icon: Bot, title: "Prometheus IA", desc: "Converse com o assistente a qualquer momento — ele conhece suas tarefas e finanças pra responder com contexto." },
-  { tag: "notificações", icon: Bell, title: "Email ou WhatsApp", desc: "Escolha o canal por categoria: redefinição de senha, lembretes, briefing diário e alertas de orçamento." },
+  { tag: "notificações", icon: Bell, title: "Avisos por email", desc: "Redefinição de senha, lembretes de tarefa, briefing diário e alerta de orçamento chegam por email — sem configurar nada. WhatsApp é um canal opcional, ativado depois nas configurações." },
 ];
 
 function Features() {
@@ -176,10 +176,10 @@ function Features() {
 // Como funciona
 // =============================================================================
 const STEPS = [
-  { n: "01", title: "Cadastre-se", desc: "nome · email · WhatsApp" },
-  { n: "02", title: "Verifique", desc: "código chega no WhatsApp" },
-  { n: "03", title: "Organize", desc: "tarefas · finanças · notas" },
-  { n: "04", title: "Receba", desc: "email ou WhatsApp, por categoria" },
+  { n: "01", title: "Cadastre-se", desc: "nome · email · senha" },
+  { n: "02", title: "Organize", desc: "tarefas · finanças · notas" },
+  { n: "03", title: "Converse", desc: "peça um resumo ao Prometheus" },
+  { n: "04", title: "Receba", desc: "avisos por email, sem configurar nada" },
 ];
 
 function HowItWorks() {
@@ -188,7 +188,7 @@ function HowItWorks() {
       <div className="mx-auto max-w-6xl px-6 py-20 sm:px-10 sm:py-28">
         <p className="font-mono text-[13px] text-zinc-400">// como funciona</p>
         <h2 className="mt-4 text-[clamp(28px,4.6vw,54px)] leading-[0.98] font-extrabold tracking-tight">
-          Do cadastro<br />ao primeiro aviso.
+          Do cadastro<br />ao primeiro dia organizado.
         </h2>
         <div className="mt-10 flex flex-wrap items-stretch gap-2">
           {STEPS.map((s, i) => (
@@ -211,9 +211,9 @@ function HowItWorks() {
 // FAQ
 // =============================================================================
 const FAQ = [
-  { q: "Preciso saber configurar algo técnico?", a: "Não. Você cria a conta, verifica o WhatsApp com um código e já pode usar. Nada de API, template ou configuração manual do seu lado." },
+  { q: "Preciso saber configurar algo técnico?", a: "Não. Você cria a conta com nome, email e senha e já pode usar. Nada de API, template ou configuração manual do seu lado." },
   { q: "Meus dados ficam visíveis pra outras pessoas?", a: "Não. Cada conta é isolada — tarefas, finanças e notas de um usuário nunca aparecem pra outro. Só o superadmin tem um painel próprio de gestão, sem acesso ao conteúdo das suas tarefas ou finanças." },
-  { q: "O WhatsApp é obrigatório?", a: "O número é pedido no cadastro e verificado por código, mas você escolhe por categoria se quer receber por WhatsApp, email, ou os dois — o email sempre funciona como alternativa." },
+  { q: "O WhatsApp é obrigatório?", a: "Não. Os avisos já chegam por email, sem nenhuma configuração. O WhatsApp é um canal opcional que dá pra ativar depois, nas Configurações." },
   { q: "O Prometheus usa qual IA?", a: "Gemini, da Google, rodando só no backend — a chave nunca fica exposta no aplicativo instalado." },
   { q: "Isso é gratuito?", a: "Sim, por enquanto o DailyLoop é de uso pessoal e gratuito." },
 ];
