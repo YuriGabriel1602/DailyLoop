@@ -14,12 +14,14 @@ router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 class TaskCreate(BaseModel):
     title: str
     category: str = "Geral"
+    priority: str = "normal"
     due_at: Optional[datetime] = None
 
 
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
     category: Optional[str] = None
+    priority: Optional[str] = None
     completed: Optional[bool] = None
     due_at: Optional[datetime] = None
 
@@ -47,7 +49,13 @@ def create_task(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    db_task = Task(title=task.title, category=task.category, due_at=task.due_at, owner_id=current_user.id)
+    db_task = Task(
+        title=task.title,
+        category=task.category,
+        priority=task.priority,
+        due_at=task.due_at,
+        owner_id=current_user.id,
+    )
     session.add(db_task)
     session.commit()
     session.refresh(db_task)

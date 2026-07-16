@@ -48,6 +48,7 @@ class Task(SQLModel, table=True):
     owner_id: int = Field(foreign_key="user.id")
     title: str
     category: str = "Geral"
+    priority: str = "normal"  # baixa, normal, alta
     completed: bool = False
     created_at: datetime = Field(default_factory=datetime.utcnow)
     due_at: Optional[datetime] = None
@@ -107,8 +108,25 @@ connect_args = (
 engine = create_engine(settings.database_url, connect_args=connect_args)
 
 
+def _run_lightweight_migrations():
+    """SQLite não altera colunas de tabelas já existentes com create_all — sem isso,
+    adicionar um Field novo a um modelo que já tem tabela criada no banco de dev
+    quebraria com "no such column" em vez de simplesmente aparecer com o default."""
+    migrations = [
+        ("task", "priority", "ALTER TABLE task ADD COLUMN priority VARCHAR DEFAULT 'normal'"),
+    ]
+    with engine.connect() as conn:
+        for table_name, column_name, ddl in migrations:
+            existing = {row[1] for row in conn.exec_driver_sql(f'PRAGMA table_info("{table_name}")')}
+            if not existing or column_name in existing:
+                continue
+            conn.exec_driver_sql(ddl)
+        conn.commit()
+
+
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
+    _run_lightweight_migrations()
 
 
 def get_session():
