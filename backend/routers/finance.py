@@ -450,6 +450,7 @@ def get_stats(
         percent_used = float(spent / b.monthly_limit * 100) if b.monthly_limit else 0.0
         budget_status.append(
             {
+                "id": b.id,
                 "category": b.category,
                 "monthly_limit": b.monthly_limit,
                 "spent_this_month": spent,

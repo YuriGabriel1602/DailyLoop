@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BarChart3, PieChart as PieIcon, Receipt, TrendingDown, TrendingUp, Upload, Wallet } from "lucide-react";
+import { BarChart3, PieChart as PieIcon, PlusCircle, Receipt, Trash2, TrendingDown, TrendingUp, Upload, Wallet } from "lucide-react";
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
@@ -34,7 +34,7 @@ interface Stats {
     current_month_by_category: Record<string, string>;
     previous_month_by_category: Record<string, string>;
   };
-  budgets: { category: string; monthly_limit: string; spent_this_month: string; percent_used: number; over_budget: boolean }[];
+  budgets: { id: number; category: string; monthly_limit: string; spent_this_month: string; percent_used: number; over_budget: boolean }[];
 }
 
 // Paleta categórica validada (references/palette.md do skill dataviz), ordem fixa —
@@ -51,6 +51,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 const FALLBACK_COLOR = "#e66767";
 const categoryColor = (category: string) => CATEGORY_COLORS[category] ?? FALLBACK_COLOR;
+const BUDGET_CATEGORIES = Object.keys(CATEGORY_COLORS).filter((c) => c !== "Renda");
 
 // Paleta de status (fixa, nunca reusada como cor de categoria) — valores hardcoded
 // direto nas classes Tailwind abaixo (good #0ca30c / warning #fab219 / critical #d03b3b)
@@ -83,6 +84,9 @@ export default function FinancePage() {
   const [type, setType] = useState<"income" | "expense">("expense");
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [budgetCategory, setBudgetCategory] = useState(BUDGET_CATEGORIES[0]);
+  const [budgetLimit, setBudgetLimit] = useState("");
+  const [savingBudget, setSavingBudget] = useState(false);
 
   const refresh = () => {
     api.get<Stats>("/api/finance/stats").then(setStats);
@@ -100,6 +104,30 @@ export default function FinancePage() {
       refresh();
     } catch (err) {
       if (!(err instanceof ApiError && err.status === 401)) toast.error("Não foi possível salvar a transação.");
+    }
+  };
+
+  const saveBudget = async () => {
+    if (!budgetLimit) return;
+    setSavingBudget(true);
+    try {
+      await api.put("/api/finance/budgets", { category: budgetCategory, monthly_limit: budgetLimit });
+      setBudgetLimit("");
+      refresh();
+      toast.success(`Orçamento de ${budgetCategory} definido.`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível salvar o orçamento.");
+    } finally {
+      setSavingBudget(false);
+    }
+  };
+
+  const removeBudget = async (id: number) => {
+    try {
+      await api.delete(`/api/finance/budgets/${id}`);
+      refresh();
+    } catch {
+      toast.error("Não foi possível remover o orçamento.");
     }
   };
 
@@ -297,6 +325,19 @@ export default function FinancePage() {
           <Card>
             <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Orçamentos</CardTitle></CardHeader>
             <CardContent className="space-y-4">
+              <div className="flex items-center gap-1.5">
+                <Select value={budgetCategory} onValueChange={setBudgetCategory}>
+                  <SelectTrigger size="sm" className="flex-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {BUDGET_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Input value={budgetLimit} onChange={(e) => setBudgetLimit(e.target.value)} placeholder="Limite (ex: 300)" className="w-28" />
+                <Button size="icon-sm" variant="secondary" onClick={saveBudget} disabled={savingBudget || !budgetLimit}>
+                  <PlusCircle size={15} />
+                </Button>
+              </div>
+
               {!stats || stats.budgets.length === 0 ? (
                 <p className="text-xs text-muted-foreground">Nenhum orçamento definido.</p>
               ) : (
@@ -307,12 +348,20 @@ export default function FinancePage() {
                       ? "[&>[data-slot=progress-indicator]]:bg-[#fab219]"
                       : "[&>[data-slot=progress-indicator]]:bg-[#0ca30c]";
                   return (
-                    <div key={b.category}>
-                      <div className="mb-1.5 flex justify-between text-xs">
+                    <div key={b.id} className="group">
+                      <div className="mb-1.5 flex items-center justify-between gap-2 text-xs">
                         <span className="font-medium">{b.category}</span>
-                        <span className={cn("tabular-nums", b.over_budget && "text-destructive")}>
-                          {formatBRL(b.spent_this_month)} / {formatBRL(b.monthly_limit)}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={cn("tabular-nums", b.over_budget && "text-destructive")}>
+                            {formatBRL(b.spent_this_month)} / {formatBRL(b.monthly_limit)}
+                          </span>
+                          <button
+                            onClick={() => removeBudget(b.id)}
+                            className="text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
                       </div>
                       <Progress value={Math.min(100, b.percent_used)} className={cn("h-1.5", statusClass)} />
                     </div>
