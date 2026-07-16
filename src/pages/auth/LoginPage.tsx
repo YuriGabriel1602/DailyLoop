@@ -6,6 +6,7 @@ import { useStore } from "@/store/useStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/PasswordInput";
 import { AuthLayout } from "./AuthLayout";
 
 export default function LoginPage() {
@@ -36,9 +37,10 @@ export default function LoginPage() {
 
   return (
     <AuthLayout>
-      <div className="space-y-1.5 mb-6">
-        <h2 className="text-xl font-semibold tracking-tight">Bem-vindo de volta</h2>
-        <p className="text-sm text-muted-foreground">Acesse sua conta para continuar.</p>
+      <div className="mb-6 space-y-1">
+        <p className="font-mono text-[13px] text-muted-foreground">// entrar</p>
+        <h2 className="text-2xl font-extrabold tracking-tight">Bem-vindo de volta.</h2>
+        <p className="pt-1 text-sm text-muted-foreground">Acesse sua conta para continuar.</p>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>}
@@ -51,7 +53,7 @@ export default function LoginPage() {
             <Label htmlFor="password">Senha</Label>
             <Link to="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground">Esqueci minha senha</Link>
           </div>
-          <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <PasswordInput id="password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
         <Button type="submit" disabled={loading} className="w-full gap-1.5">
           {loading ? "Entrando..." : "Entrar"} {!loading && <ArrowRight size={15} />}

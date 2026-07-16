@@ -3,8 +3,8 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { CheckCircle2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/PasswordInput";
 import { AuthLayout } from "./AuthLayout";
 
 export default function ResetPasswordPage() {
@@ -32,9 +32,10 @@ export default function ResetPasswordPage() {
 
   return (
     <AuthLayout>
-      <div className="mb-6 space-y-1.5">
-        <h2 className="text-xl font-semibold tracking-tight">Redefinir senha</h2>
-        <p className="text-sm text-muted-foreground">Escolha uma nova senha para sua conta.</p>
+      <div className="mb-6 space-y-1">
+        <p className="font-mono text-[13px] text-muted-foreground">// redefinir senha</p>
+        <h2 className="text-2xl font-extrabold tracking-tight">Escolha uma nova senha.</h2>
+        <p className="pt-1 text-sm text-muted-foreground">Vale para todas as suas próximas entradas.</p>
       </div>
       {error && <p className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>}
       {success ? (
@@ -46,7 +47,7 @@ export default function ResetPasswordPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="password">Nova senha</Label>
-            <Input id="password" type="password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 8 caracteres" />
+            <PasswordInput id="password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 8 caracteres" />
           </div>
           <Button type="submit" disabled={loading || !token} className="w-full">
             {loading ? "Redefinindo..." : "Redefinir senha"}

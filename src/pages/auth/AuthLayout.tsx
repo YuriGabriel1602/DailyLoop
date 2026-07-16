@@ -1,51 +1,68 @@
 import type { ReactNode } from "react";
 import { motion } from "framer-motion";
-import { CalendarClock, ShieldCheck, Sparkles } from "lucide-react";
+import { Check } from "lucide-react";
 import { Logo } from "@/components/Logo";
 
-const HIGHLIGHTS = [
-  { icon: Sparkles, text: "Prometheus organiza seu dia antes de você precisar pensar nele" },
-  { icon: CalendarClock, text: "Tarefas, finanças e agenda num só lugar, sem fragmentação" },
-  { icon: ShieldCheck, text: "Cada conta é isolada — seus dados são só seus" },
+const PREVIEW_ITEMS = [
+  { label: "Reunião com cliente às 15h", done: true },
+  { label: "Revisar proposta financeira", done: true },
+  { label: "Fechar o mês em Finanças", done: false },
 ];
 
 export function AuthLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="flex h-screen w-screen bg-background text-foreground">
-      <div className="relative hidden w-[45%] max-w-xl flex-col justify-between overflow-hidden border-r bg-card p-10 lg:flex">
+    <div className="grid h-screen w-screen bg-background text-foreground lg:grid-cols-[0.92fr_1.08fr]">
+      <aside className="relative hidden flex-col justify-between overflow-hidden bg-[oklch(0.08_0_0)] p-10 text-white lg:flex">
         <div
-          className="pointer-events-none absolute inset-0"
+          className="pointer-events-none absolute inset-0 opacity-40"
           style={{
-            background:
-              "radial-gradient(circle at 20% 20%, color-mix(in oklch, var(--primary) 18%, transparent), transparent 55%), radial-gradient(circle at 85% 75%, color-mix(in oklch, var(--primary) 10%, transparent), transparent 50%)",
+            backgroundImage:
+              "linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px)",
+            backgroundSize: "32px 32px",
+            maskImage: "radial-gradient(circle at 30% 20%, black, transparent 75%)",
           }}
         />
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{ background: "radial-gradient(circle at 15% 10%, color-mix(in oklch, var(--primary) 25%, transparent), transparent 55%)" }}
+        />
+
         <Logo className="relative z-10" />
 
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="relative z-10 space-y-8">
-          <h1 className="max-w-sm text-3xl leading-tight font-semibold tracking-tight">
-            O assistente que monta o seu dia por você.
-          </h1>
-          <div className="space-y-4">
-            {HIGHLIGHTS.map((item, i) => (
-              <motion.div
-                key={item.text}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.15 + i * 0.1, duration: 0.4 }}
-                className="flex items-start gap-3 text-sm text-muted-foreground"
-              >
-                <item.icon size={16} className="mt-0.5 shrink-0 text-primary" />
-                <span>{item.text}</span>
-              </motion.div>
-            ))}
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="relative z-10 space-y-7">
+          <div className="w-fit max-w-xs rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+            <p className="mb-3 font-mono text-[11px] text-zinc-400">// hoje · em dia</p>
+            <div className="space-y-3">
+              {PREVIEW_ITEMS.map((item, i) => (
+                <motion.div
+                  key={item.label}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 + i * 0.1, duration: 0.4 }}
+                  className="flex items-center gap-3"
+                >
+                  <span
+                    className={`flex size-5 shrink-0 items-center justify-center rounded-full ${
+                      item.done ? "bg-primary text-primary-foreground" : "animate-pulse bg-white/10 text-zinc-500"
+                    }`}
+                  >
+                    <Check size={11} strokeWidth={3} />
+                  </span>
+                  <span className="flex-1 truncate text-sm text-zinc-200">{item.label}</span>
+                </motion.div>
+              ))}
+            </div>
           </div>
+
+          <h1 className="max-w-sm text-[28px] leading-[1.15] font-extrabold tracking-tight">
+            Dispare menos perguntas ao dia. <span className="text-primary">Deixe o Prometheus organizar.</span>
+          </h1>
         </motion.div>
 
-        <p className="relative z-10 text-xs text-muted-foreground">© {new Date().getFullYear()} DailyLoop</p>
-      </div>
+        <p className="relative z-10 font-mono text-xs text-zinc-500">// um produto DailyLoop</p>
+      </aside>
 
-      <div className="flex flex-1 items-center justify-center p-4">
+      <section className="flex items-center justify-center bg-background px-6 py-12 sm:px-10">
         <div className="w-full max-w-sm">
           <div className="mb-8 flex justify-center lg:hidden">
             <Logo />
@@ -54,7 +71,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
             {children}
           </motion.div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

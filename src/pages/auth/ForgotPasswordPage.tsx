@@ -25,9 +25,10 @@ export default function ForgotPasswordPage() {
 
   return (
     <AuthLayout>
-      <div className="mb-6 space-y-1.5">
-        <h2 className="text-xl font-semibold tracking-tight">Esqueci minha senha</h2>
-        <p className="text-sm text-muted-foreground">Informe seu email — se existir uma conta, enviaremos um link de redefinição.</p>
+      <div className="mb-6 space-y-1">
+        <p className="font-mono text-[13px] text-muted-foreground">// esqueci a senha</p>
+        <h2 className="text-2xl font-extrabold tracking-tight">Vamos recuperar.</h2>
+        <p className="pt-1 text-sm text-muted-foreground">Informe seu email — se existir uma conta, enviaremos um link de redefinição.</p>
       </div>
       {sent ? (
         <div className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600 dark:text-emerald-400">
