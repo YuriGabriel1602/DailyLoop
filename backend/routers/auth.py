@@ -1,4 +1,5 @@
 import logging
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -7,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
 from config import settings
-from database import PasswordResetToken, User, get_session
+from database import PasswordResetToken, PhoneVerificationCode, User, get_session
 from services.auth_service import (
     create_access_token,
     generate_reset_token,
@@ -16,6 +17,7 @@ from services.auth_service import (
     verify_password,
 )
 from services.notification_service import notify
+from services.whatsapp_service import send_whatsapp_template
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,7 @@ def _user_public(user: User) -> dict:
         "role": user.role,
         "is_active": user.is_active,
         "phone_number": user.phone_number,
+        "phone_verified": user.phone_verified,
         "whatsapp_opted_in": user.whatsapp_opted_in,
     }
 
@@ -121,15 +124,101 @@ def update_me(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    if payload.phone_number is not None:
-        phone = payload.phone_number.strip()
-        if phone and not phone.startswith("+"):
-            raise HTTPException(status_code=400, detail="Telefone deve estar no formato E.164 (ex: +5511999999999)")
-        current_user.phone_number = phone or None
+    if payload.phone_number is not None and not payload.phone_number.strip():
+        # Só permite LIMPAR o telefone por aqui — cadastrar um número novo
+        # passa obrigatoriamente pelo fluxo de verificação (/phone/request-code).
+        current_user.phone_number = None
+        current_user.phone_verified = False
+        current_user.whatsapp_opted_in = False
     if payload.whatsapp_opted_in is not None:
-        if payload.whatsapp_opted_in and not current_user.phone_number:
-            raise HTTPException(status_code=400, detail="Cadastre um telefone antes de ativar o WhatsApp")
+        if payload.whatsapp_opted_in and not current_user.phone_verified:
+            raise HTTPException(status_code=400, detail="Verifique seu telefone antes de ativar o WhatsApp")
         current_user.whatsapp_opted_in = payload.whatsapp_opted_in
+    session.add(current_user)
+    session.commit()
+    session.refresh(current_user)
+    return _user_public(current_user)
+
+
+def _normalize_e164(phone_number: str) -> str:
+    phone = phone_number.strip()
+    if not phone.startswith("+"):
+        raise HTTPException(status_code=400, detail="Telefone deve estar no formato E.164 (ex: +5511999999999)")
+    return phone
+
+
+class PhoneRequestCodeRequest(BaseModel):
+    phone_number: str
+
+
+@router.post("/phone/request-code")
+def request_phone_code(
+    payload: PhoneRequestCodeRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    phone = _normalize_e164(payload.phone_number)
+
+    recent = session.exec(
+        select(PhoneVerificationCode)
+        .where(PhoneVerificationCode.user_id == current_user.id)
+        .order_by(PhoneVerificationCode.created_at.desc())
+    ).first()
+    if recent and recent.created_at.replace(tzinfo=timezone.utc) > datetime.now(timezone.utc) - timedelta(
+        seconds=settings.phone_verification_resend_cooldown_seconds
+    ):
+        raise HTTPException(status_code=429, detail="Aguarde um pouco antes de pedir um novo código.")
+
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    session.add(
+        PhoneVerificationCode(
+            user_id=current_user.id,
+            phone_number=phone,
+            code=code,
+            expires_at=datetime.now(timezone.utc)
+            + timedelta(minutes=settings.phone_verification_code_expire_minutes),
+        )
+    )
+    # Telefone fica associado mas NÃO verificado até o código ser confirmado.
+    current_user.phone_number = phone
+    current_user.phone_verified = False
+    current_user.whatsapp_opted_in = False
+    session.add(current_user)
+    session.commit()
+
+    sent = send_whatsapp_template(phone, settings.whatsapp_template_otp, [code])
+    if not sent:
+        # WhatsApp não configurado/recusado (modo dev): loga o código pra não travar o teste.
+        logger.info("Código de verificação (WhatsApp não configurado) para %s: %s", phone, code)
+
+    return {"message": "Código enviado.", "whatsapp_sent": sent}
+
+
+class PhoneVerifyCodeRequest(BaseModel):
+    code: str
+
+
+@router.post("/phone/verify-code")
+def verify_phone_code(
+    payload: PhoneVerifyCodeRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    verification = session.exec(
+        select(PhoneVerificationCode)
+        .where(PhoneVerificationCode.user_id == current_user.id, PhoneVerificationCode.code == payload.code)
+        .order_by(PhoneVerificationCode.created_at.desc())
+    ).first()
+
+    invalid = HTTPException(status_code=400, detail="Código inválido ou expirado")
+    if not verification or verification.used:
+        raise invalid
+    if verification.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+        raise invalid
+
+    verification.used = True
+    current_user.phone_verified = True
+    session.add(verification)
     session.add(current_user)
     session.commit()
     session.refresh(current_user)

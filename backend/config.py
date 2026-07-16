@@ -61,12 +61,22 @@ class Settings:
         "WHATSAPP_TEMPLATE_BUDGET_ALERT", "budget_alert"
     )
     whatsapp_template_language: str = os.getenv("WHATSAPP_TEMPLATE_LANGUAGE", "pt_BR")
+    # Template de categoria "Authentication" (código de verificação de telefone).
+    whatsapp_template_otp: str = os.getenv("WHATSAPP_TEMPLATE_OTP", "otp_verification")
 
     # Agendamento (horário do servidor) do briefing diário e intervalo de
     # checagem de lembretes de tarefa.
     daily_briefing_hour: int = int(os.getenv("DAILY_BRIEFING_HOUR", "7"))
     task_reminder_check_minutes: int = int(os.getenv("TASK_REMINDER_CHECK_MINUTES", "15"))
     task_reminder_window_minutes: int = int(os.getenv("TASK_REMINDER_WINDOW_MINUTES", "60"))
+
+    # Verificação de telefone (código de uso único)
+    phone_verification_code_expire_minutes: int = int(
+        os.getenv("PHONE_VERIFICATION_CODE_EXPIRE_MINUTES", "10")
+    )
+    phone_verification_resend_cooldown_seconds: int = int(
+        os.getenv("PHONE_VERIFICATION_RESEND_COOLDOWN_SECONDS", "60")
+    )
 
 
 settings = Settings()

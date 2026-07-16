@@ -20,6 +20,7 @@ class User(SQLModel, table=True):
     is_active: bool = True
     created_at: datetime = Field(default_factory=datetime.utcnow)
     phone_number: Optional[str] = None  # E.164, ex: +5511999999999
+    phone_verified: bool = False
     whatsapp_opted_in: bool = False
 
 
@@ -27,6 +28,16 @@ class PasswordResetToken(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id")
     token: str = Field(index=True, unique=True)
+    expires_at: datetime
+    used: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class PhoneVerificationCode(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    phone_number: str
+    code: str
     expires_at: datetime
     used: bool = False
     created_at: datetime = Field(default_factory=datetime.utcnow)

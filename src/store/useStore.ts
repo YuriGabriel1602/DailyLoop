@@ -8,6 +8,7 @@ export interface AuthUser {
   role: 'user' | 'admin';
   is_active: boolean;
   phone_number: string | null;
+  phone_verified: boolean;
   whatsapp_opted_in: boolean;
 }
 

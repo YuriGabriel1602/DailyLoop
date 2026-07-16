@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { toast } from "sonner";
-import { LogOut, MessageCircle, Server, ShieldCheck } from "lucide-react";
+import { CheckCircle2, LogOut, MessageCircle, Server, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,10 @@ export default function SettingsPage() {
   const handleToggle = (index: number) => setToggles((prev) => prev.map((v, i) => (i === index ? !v : v)));
 
   const [phone, setPhone] = useState(user?.phone_number ?? "");
-  const [savingPhone, setSavingPhone] = useState(false);
+  const [code, setCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
+  const [requestingCode, setRequestingCode] = useState(false);
+  const [verifyingCode, setVerifyingCode] = useState(false);
   const [preferences, setPreferences] = useState<NotificationPreference[] | null>(null);
 
   useEffect(() => {
@@ -49,16 +52,32 @@ export default function SettingsPage() {
     navigate("/login", { replace: true });
   };
 
-  const savePhone = async () => {
-    setSavingPhone(true);
+  const requestCode = async () => {
+    setRequestingCode(true);
     try {
-      const updated = await api.patch<typeof user>("/api/auth/me", { phone_number: phone });
-      if (updated) updateUser(updated);
-      toast.success("Telefone salvo.");
+      const result = await api.post<{ whatsapp_sent: boolean }>("/api/auth/phone/request-code", { phone_number: phone });
+      setCodeSent(true);
+      updateUser({ phone_number: phone, phone_verified: false });
+      toast.success(result.whatsapp_sent ? "Código enviado por WhatsApp." : "Código gerado — confira o log do backend (WhatsApp não configurado).");
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Não foi possível salvar o telefone.");
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível enviar o código.");
     } finally {
-      setSavingPhone(false);
+      setRequestingCode(false);
+    }
+  };
+
+  const verifyCode = async () => {
+    setVerifyingCode(true);
+    try {
+      const updated = await api.post<typeof user>("/api/auth/phone/verify-code", { code });
+      if (updated) updateUser(updated);
+      setCodeSent(false);
+      setCode("");
+      toast.success("Telefone verificado!");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Código inválido ou expirado.");
+    } finally {
+      setVerifyingCode(false);
     }
   };
 
@@ -137,20 +156,47 @@ export default function SettingsPage() {
             <div className="space-y-1.5">
               <Label htmlFor="phone">Telefone (formato internacional)</Label>
               <div className="flex gap-2">
-                <Input id="phone" placeholder="+5511999999999" value={phone} onChange={(e) => setPhone(e.target.value)} />
-                <Button variant="outline" onClick={savePhone} disabled={savingPhone} className="shrink-0">
-                  {savingPhone ? "Salvando..." : "Salvar"}
+                <Input
+                  id="phone"
+                  placeholder="+5511999999999"
+                  value={phone}
+                  onChange={(e) => { setPhone(e.target.value); setCodeSent(false); }}
+                  disabled={requestingCode}
+                />
+                <Button variant="outline" onClick={requestCode} disabled={requestingCode || !phone.trim()} className="shrink-0">
+                  {requestingCode ? "Enviando..." : "Enviar código"}
                 </Button>
               </div>
+              {user?.phone_verified && user.phone_number === phone && !codeSent && (
+                <p className="flex items-center gap-1 text-xs text-emerald-500"><CheckCircle2 size={12} /> Telefone verificado</p>
+              )}
             </div>
+
+            {codeSent && (
+              <div className="space-y-1.5 rounded-lg border bg-muted/30 p-3">
+                <Label htmlFor="code">Código recebido por WhatsApp</Label>
+                <div className="flex gap-2">
+                  <Input id="code" placeholder="000000" maxLength={6} value={code} onChange={(e) => setCode(e.target.value)} />
+                  <Button onClick={verifyCode} disabled={verifyingCode || code.length !== 6} className="shrink-0">
+                    {verifyingCode ? "Verificando..." : "Verificar"}
+                  </Button>
+                </div>
+                <button onClick={requestCode} disabled={requestingCode} className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground">
+                  Reenviar código
+                </button>
+              </div>
+            )}
+
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">Receber notificações por WhatsApp</p>
-                <p className="text-xs text-muted-foreground">Precisa de um telefone salvo primeiro.</p>
+                <p className="text-xs text-muted-foreground">
+                  {user?.phone_verified ? "Telefone verificado." : "Verifique seu telefone primeiro."}
+                </p>
               </div>
               <Switch
                 checked={user?.whatsapp_opted_in ?? false}
-                disabled={!user?.phone_number}
+                disabled={!user?.phone_verified}
                 onCheckedChange={toggleWhatsappOptIn}
               />
             </div>
