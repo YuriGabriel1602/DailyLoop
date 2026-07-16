@@ -6,7 +6,6 @@ import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
-import VerifyPhonePage from "./pages/auth/VerifyPhonePage";
 import LandingPage from "./pages/LandingPage";
 import HomePage from "./pages/HomePage";
 import TasksPage from "./pages/TasksPage";
@@ -16,17 +15,9 @@ import SettingsPage from "./pages/SettingsPage";
 import AdminPage from "./pages/AdminPage";
 import { Toaster } from "@/components/ui/sonner";
 
-const RequireAuthOnly = ({ children }: { children: ReactNode }) => {
-  const token = useStore((s) => s.token);
-  if (!token) return <Navigate to="/login" replace />;
-  return children;
-};
-
 const RequireAuth = ({ children }: { children: ReactNode }) => {
   const token = useStore((s) => s.token);
-  const user = useStore((s) => s.user);
   if (!token) return <Navigate to="/login" replace />;
-  if (user?.phone_number && !user.phone_verified) return <Navigate to="/verify-phone" replace />;
   return children;
 };
 
@@ -49,14 +40,6 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
-          <Route
-            path="/verify-phone"
-            element={
-              <RequireAuthOnly>
-                <VerifyPhonePage />
-              </RequireAuthOnly>
-            }
-          />
 
           <Route
             element={

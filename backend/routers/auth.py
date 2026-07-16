@@ -41,7 +41,6 @@ class RegisterRequest(BaseModel):
     username: str = Field(min_length=3, max_length=50)
     email: str
     password: str = Field(min_length=8)
-    phone_number: str
 
 
 class LoginRequest(BaseModel):
@@ -111,7 +110,6 @@ def _issue_verification_code(session: Session, user: User, phone: str, *, enforc
 @router.post("/register")
 def register(payload: RegisterRequest, session: Session = Depends(get_session)):
     _validate_email(payload.email)
-    phone = _normalize_e164(payload.phone_number)
 
     existing = session.exec(
         select(User).where(
@@ -132,17 +130,11 @@ def register(payload: RegisterRequest, session: Session = Depends(get_session)):
     session.commit()
     session.refresh(user)
 
-    # Dispara a verificação do telefone já na criação da conta — sem cooldown
-    # (é o primeiro código, não um reenvio).
-    whatsapp_sent = _issue_verification_code(session, user, phone, enforce_cooldown=False)
-    session.refresh(user)
-
     token = create_access_token(user.id, user.role)
     return {
         "access_token": token,
         "token_type": "bearer",
         "user": _user_public(user),
-        "whatsapp_sent": whatsapp_sent,
     }
 
 
