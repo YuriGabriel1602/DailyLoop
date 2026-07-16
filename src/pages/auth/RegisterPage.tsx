@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Loader2, Mail, User } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { useStore } from "@/store/useStore";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { InputWithIcon } from "@/components/InputWithIcon";
 import { PasswordInput } from "@/components/PasswordInput";
+import { PasswordStrengthMeter } from "@/components/PasswordStrengthMeter";
 import { AuthLayout } from "./AuthLayout";
 
 export default function RegisterPage() {
@@ -44,18 +45,19 @@ export default function RegisterPage() {
         {error && <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>}
         <div className="space-y-1.5">
           <Label htmlFor="username">Username</Label>
-          <Input id="username" autoFocus value={username} onChange={(e) => setUsername(e.target.value)} />
+          <InputWithIcon icon={User} id="username" autoFocus value={username} onChange={(e) => setUsername(e.target.value)} />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <InputWithIcon icon={Mail} id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="password">Senha</Label>
           <PasswordInput id="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 8 caracteres" />
+          <PasswordStrengthMeter password={password} />
         </div>
         <Button type="submit" disabled={loading} className="w-full gap-1.5">
-          {loading ? "Criando..." : "Criar conta"} {!loading && <ArrowRight size={15} />}
+          {loading ? <Loader2 size={15} className="animate-spin" /> : <>Criar conta <ArrowRight size={15} /></>}
         </Button>
         <p className="text-center text-xs text-muted-foreground">
           Já tem conta? <Link to="/login" className="text-foreground underline underline-offset-4">Entrar</Link>

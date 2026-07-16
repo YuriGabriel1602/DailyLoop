@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Loader2, Mail } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { InputWithIcon } from "@/components/InputWithIcon";
 import { AuthLayout } from "./AuthLayout";
 
 export default function ForgotPasswordPage() {
@@ -39,10 +39,10 @@ export default function ForgotPasswordPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" autoFocus value={email} onChange={(e) => setEmail(e.target.value)} />
+            <InputWithIcon icon={Mail} id="email" type="email" autoFocus value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
           <Button type="submit" disabled={loading} className="w-full">
-            {loading ? "Enviando..." : "Enviar link"}
+            {loading ? <Loader2 size={15} className="animate-spin" /> : "Enviar link"}
           </Button>
         </form>
       )}

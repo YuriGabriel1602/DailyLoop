@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Loader2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/PasswordInput";
+import { PasswordStrengthMeter } from "@/components/PasswordStrengthMeter";
 import { AuthLayout } from "./AuthLayout";
 
 export default function ResetPasswordPage() {
@@ -48,9 +49,10 @@ export default function ResetPasswordPage() {
           <div className="space-y-1.5">
             <Label htmlFor="password">Nova senha</Label>
             <PasswordInput id="password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 8 caracteres" />
+            <PasswordStrengthMeter password={password} />
           </div>
           <Button type="submit" disabled={loading || !token} className="w-full">
-            {loading ? "Redefinindo..." : "Redefinir senha"}
+            {loading ? <Loader2 size={15} className="animate-spin" /> : "Redefinir senha"}
           </Button>
         </form>
       )}

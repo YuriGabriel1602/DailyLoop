@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Loader2, User } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { useStore } from "@/store/useStore";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { InputWithIcon } from "@/components/InputWithIcon";
 import { PasswordInput } from "@/components/PasswordInput";
 import { AuthLayout } from "./AuthLayout";
 
@@ -46,7 +46,7 @@ export default function LoginPage() {
         {error && <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>}
         <div className="space-y-1.5">
           <Label htmlFor="usernameOrEmail">Username ou email</Label>
-          <Input id="usernameOrEmail" autoFocus value={usernameOrEmail} onChange={(e) => setUsernameOrEmail(e.target.value)} />
+          <InputWithIcon icon={User} id="usernameOrEmail" autoFocus value={usernameOrEmail} onChange={(e) => setUsernameOrEmail(e.target.value)} />
         </div>
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
@@ -56,7 +56,7 @@ export default function LoginPage() {
           <PasswordInput id="password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
         <Button type="submit" disabled={loading} className="w-full gap-1.5">
-          {loading ? "Entrando..." : "Entrar"} {!loading && <ArrowRight size={15} />}
+          {loading ? <Loader2 size={15} className="animate-spin" /> : <>Entrar <ArrowRight size={15} /></>}
         </Button>
         <p className="text-center text-xs text-muted-foreground">
           Ainda não tem conta? <Link to="/register" className="text-foreground underline underline-offset-4">Criar conta</Link>

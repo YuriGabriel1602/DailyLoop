@@ -31,7 +31,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
           </h1>
         </motion.div>
 
-        <p className="relative z-10 font-mono text-xs text-zinc-500">// um produto DailyLoop</p>
+        <p className="relative z-10 font-mono text-xs text-zinc-500">DailyLoop™</p>
       </aside>
 
       <section className="flex items-center justify-center bg-background px-6 py-12 sm:px-10">
