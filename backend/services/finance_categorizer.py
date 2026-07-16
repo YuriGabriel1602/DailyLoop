@@ -1,9 +1,11 @@
+from functools import lru_cache
+
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import make_pipeline
 
-# DADOS DE TREINO EXPANDIDOS: Mais inteligência para o Prometheus
-training_data = [
+# Dados de treino do categorizador de gastos.
+TRAINING_DATA = [
     # Alimentação
     ("café padaria manha lanche", "Alimentação"),
     ("almoço restaurante quilo prato", "Alimentação"),
@@ -35,28 +37,32 @@ training_data = [
     ("curso faculdade udemy mensalidade escola", "Educação"),
     # Trabalho/Renda
     ("salario pagamento deposito", "Renda"),
-    ("freela projeto pagamento recebido", "Renda")
+    ("freela projeto pagamento recebido", "Renda"),
 ]
 
-def train_categorizer():
-    """Treina o modelo de classificação de texto."""
-    try:
-        X, y = zip(*training_data)
-        # O pipeline automatiza o processo de vetorização e classificação
-        model = make_pipeline(TfidfVectorizer(), MultinomialNB())
-        model.fit(X, y)
-        print("✅ IA Financeira: Treinamento tático concluído.")
-        return model
-    except Exception as e:
-        print(f"⚠️ Erro ao treinar IA Financeira: {e}")
-        return None
 
-def predict_category(model, description: str) -> str:
+@lru_cache(maxsize=1)
+def get_model():
+    """Treina (uma única vez, cacheado) o modelo de classificação de texto."""
+    descriptions, categories = zip(*TRAINING_DATA)
+    model = make_pipeline(TfidfVectorizer(), MultinomialNB())
+    model.fit(descriptions, categories)
+    return model
+
+
+def predict_category(description: str) -> str:
     """Prediz a categoria para uma única descrição de gasto."""
-    if not model:
-        return "Outros"
     try:
-        # A IA converte o texto para minúsculas e prevê a categoria
-        return model.predict([description.lower()])[0]
-    except:
+        return get_model().predict([description.lower()])[0]
+    except Exception:
         return "Outros"
+
+
+def categorize_transactions(descriptions: list[str]) -> list[str]:
+    """Prediz a categoria para um lote de descrições (usado no import de extrato)."""
+    if not descriptions:
+        return []
+    try:
+        return list(get_model().predict([d.lower() for d in descriptions]))
+    except Exception:
+        return ["Outros" for _ in descriptions]

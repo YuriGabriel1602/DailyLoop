@@ -1,24 +1,17 @@
 fastapi
 uvicorn
-requests
-SQLAlchemy
+sqlmodel
 passlib[bcrypt]
 python-jose[cryptography]
 python-multipart
 bcrypt==3.2.0
 
-# IA
+# IA (chat Prometheus)
 google-generativeai
-google-api-python-client
+
+# Financeiro (categorização + import de extrato OFX)
+scikit-learn
+ofxparse
 
 # Config
 python-dotenv
-
-# Música
-spotipy
-
-# Agendamento Inteligente
-dateparser
-
-# HTTP Client (Necessário para Weather)
-httpx
