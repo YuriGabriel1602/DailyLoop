@@ -1,9 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
-import { TrendingDown, TrendingUp, Upload, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { api, ApiError } from "../lib/api";
-import { HeaderBack, SpotlightCard } from "../components/ui/primitives";
+import { TrendingDown, TrendingUp, Upload, Wallet } from "lucide-react";
+import {
+  Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
+} from "recharts";
+import { toast } from "sonner";
+import { api, ApiError } from "@/lib/api";
+import { PageHeader } from "@/components/PageHeader";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 interface Transaction {
   id: number;
@@ -19,12 +28,51 @@ interface Stats {
   income: string;
   expenses: string;
   by_category: Record<string, string>;
-  month_over_month: { total_change_percent: number | null };
+  month_over_month: {
+    total_change_percent: number | null;
+    current_month_by_category: Record<string, string>;
+    previous_month_by_category: Record<string, string>;
+  };
   budgets: { category: string; monthly_limit: string; spent_this_month: string; percent_used: number; over_budget: boolean }[];
 }
 
+// Paleta categórica validada (references/palette.md do skill dataviz), ordem fixa —
+// cada categoria sempre com a mesma cor em todos os gráficos da tela.
+const CATEGORY_COLORS: Record<string, string> = {
+  "Alimentação": "#3987e5",
+  "Transporte": "#008300",
+  "Moradia": "#d55181",
+  "Lazer": "#c98500",
+  "Saúde": "#199e70",
+  "Educação": "#d95926",
+  "Renda": "#9085e9",
+  "Outros": "#e66767",
+};
+const FALLBACK_COLOR = "#e66767";
+const categoryColor = (category: string) => CATEGORY_COLORS[category] ?? FALLBACK_COLOR;
+
+// Paleta de status (fixa, nunca reusada como cor de categoria) — valores hardcoded
+// direto nas classes Tailwind abaixo (good #0ca30c / warning #fab219 / critical #d03b3b)
+// porque o JIT do Tailwind precisa da string literal completa pra gerar a classe.
+
 const formatBRL = (value: string | number) =>
   Number(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+function ChartTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-lg border bg-popover px-3 py-2 text-xs shadow-md">
+      {label && <p className="mb-1 font-medium text-popover-foreground">{label}</p>}
+      {payload.map((entry: any, i: number) => (
+        <div key={i} className="flex items-center gap-1.5 text-muted-foreground">
+          <span className="size-2 rounded-full" style={{ background: entry.color || entry.payload?.fill }} />
+          <span>{entry.name}:</span>
+          <span className="font-medium text-popover-foreground">{formatBRL(entry.value)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function FinancePage() {
   const navigate = useNavigate();
@@ -51,7 +99,7 @@ export default function FinancePage() {
       setAmount("");
       refresh();
     } catch (err) {
-      if (!(err instanceof ApiError && err.status === 401)) alert("Não foi possível salvar a transação.");
+      if (!(err instanceof ApiError && err.status === 401)) toast.error("Não foi possível salvar a transação.");
     }
   };
 
@@ -73,113 +121,175 @@ export default function FinancePage() {
     }
   };
 
-  const categoryEntries = stats ? Object.entries(stats.by_category) : [];
-  const maxCategoryValue = Math.max(1, ...categoryEntries.map(([, v]) => Number(v)));
+  const donutData = stats
+    ? Object.entries(stats.by_category).map(([category, value]) => ({ name: category, value: Number(value) }))
+    : [];
+
+  const comparisonData = stats
+    ? Array.from(
+        new Set([
+          ...Object.keys(stats.month_over_month.current_month_by_category),
+          ...Object.keys(stats.month_over_month.previous_month_by_category),
+        ])
+      ).map((category) => ({
+        category,
+        "Este mês": Number(stats.month_over_month.current_month_by_category[category] ?? 0),
+        "Mês anterior": Number(stats.month_over_month.previous_month_by_category[category] ?? 0),
+      }))
+    : [];
 
   return (
-    <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.25 }} className="w-full h-full flex flex-col bg-transparent overflow-y-auto overflow-x-hidden custom-scrollbar">
-      <HeaderBack title="Centro Financeiro" onBack={() => navigate("/")} />
-      <div className="flex-1 px-4 md:px-6 max-w-5xl mx-auto w-full pb-40 space-y-4 md:space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
-          <SpotlightCard className="sm:col-span-2 md:col-span-1 p-6 md:p-8 bg-gradient-to-br from-blue-900 to-black text-white shadow-2xl overflow-hidden group border-blue-500/20">
-            <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/20 rounded-full blur-[50px] group-hover:scale-150 transition-transform duration-700 pointer-events-none" />
-            <span className="text-[10px] font-black uppercase text-blue-300 tracking-widest relative z-10 flex items-center gap-2"><Wallet size={12} /> Saldo Total</span>
-            <div className="text-3xl md:text-4xl lg:text-5xl font-black mt-4 tracking-tighter relative z-10 truncate">{stats ? formatBRL(stats.balance) : "—"}</div>
-            {stats?.month_over_month.total_change_percent != null && (
-              <div className={`mt-4 flex items-center gap-2 text-xs relative z-10 truncate ${stats.month_over_month.total_change_percent >= 0 ? "text-red-400" : "text-green-400"}`}>
-                <TrendingUp size={14} className="shrink-0" /> {stats.month_over_month.total_change_percent.toFixed(1)}% vs Mês Anterior
-              </div>
-            )}
-          </SpotlightCard>
-
-          <SpotlightCard className="p-5 md:p-6 flex flex-col justify-center">
-            <span className="text-[10px] font-black uppercase text-gray-500 tracking-widest mb-2">Entradas</span>
-            <div className="text-2xl md:text-3xl font-black text-white truncate">{stats ? formatBRL(stats.income) : "—"}</div>
-          </SpotlightCard>
-
-          <SpotlightCard className="p-5 md:p-6 flex flex-col justify-center">
-            <span className="text-[10px] font-black uppercase text-gray-500 tracking-widest mb-2">Saídas</span>
-            <div className="text-2xl md:text-3xl font-black text-white truncate">{stats ? formatBRL(stats.expenses) : "—"}</div>
-          </SpotlightCard>
+    <div className="h-full w-full overflow-y-auto overflow-x-hidden pb-28">
+      <PageHeader title="Centro Financeiro" onBack={() => navigate("/")} />
+      <div className="mx-auto w-full max-w-5xl space-y-4 px-4 md:space-y-6 md:px-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 md:gap-6">
+          <Card className="sm:col-span-1">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Wallet size={13} /> Saldo Total</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-semibold tracking-tight">{stats ? formatBRL(stats.balance) : "—"}</div>
+              {stats?.month_over_month.total_change_percent != null && (
+                <div className={cn("mt-2 flex items-center gap-1 text-xs", stats.month_over_month.total_change_percent >= 0 ? "text-destructive" : "text-emerald-500")}>
+                  {stats.month_over_month.total_change_percent >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
+                  {Math.abs(stats.month_over_month.total_change_percent).toFixed(1)}% vs mês anterior
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Entradas</CardTitle></CardHeader>
+            <CardContent><div className="text-2xl font-semibold">{stats ? formatBRL(stats.income) : "—"}</div></CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Saídas</CardTitle></CardHeader>
+            <CardContent><div className="text-2xl font-semibold">{stats ? formatBRL(stats.expenses) : "—"}</div></CardContent>
+          </Card>
         </div>
 
-        <SpotlightCard className="p-5 md:p-6 flex flex-col md:flex-row gap-3 md:items-center">
-          <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descrição (ex: Ifood almoço)" className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50" />
-          <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Valor (ex: 45,90)" className="w-full md:w-40 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50" />
-          <select value={type} onChange={(e) => setType(e.target.value as "income" | "expense")} className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none">
-            <option value="expense">Despesa</option>
-            <option value="income">Renda</option>
-          </select>
-          <button onClick={addTransaction} className="bg-white text-black font-semibold rounded-xl px-4 py-2 text-sm shrink-0">Adicionar</button>
-          <label className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl px-4 py-2 text-sm text-gray-300 cursor-pointer shrink-0 transition-colors">
+        <Card className="flex-row flex-wrap items-center gap-3 p-4">
+          <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descrição (ex: Ifood almoço)" className="flex-1 min-w-[160px]" />
+          <Input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Valor (ex: 45,90)" className="w-36" />
+          <Select value={type} onValueChange={(v) => setType(v as "income" | "expense")}>
+            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="expense">Despesa</SelectItem>
+              <SelectItem value="income">Renda</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={addTransaction}>Adicionar</Button>
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="gap-1.5">
             <Upload size={14} /> Importar CSV/OFX
-            <input ref={fileInputRef} type="file" accept=".csv,.ofx,.qfx" className="hidden" onChange={handleImport} />
-          </label>
-        </SpotlightCard>
-        {importStatus && <p className="text-xs text-gray-400 -mt-2">{importStatus}</p>}
+          </Button>
+          <input ref={fileInputRef} type="file" accept=".csv,.ofx,.qfx" className="hidden" onChange={handleImport} />
+        </Card>
+        {importStatus && <p className="-mt-2 text-xs text-muted-foreground">{importStatus}</p>}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-          <SpotlightCard className="lg:col-span-2 p-5 md:p-6 min-h-[220px] flex flex-col justify-between">
-            <span className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Gastos por Categoria</span>
-            {categoryEntries.length === 0 ? (
-              <p className="text-xs text-gray-600 mt-8 text-center">Sem despesas registradas ainda.</p>
-            ) : (
-              <div className="flex items-end justify-between h-32 md:h-40 gap-1 md:gap-2 mt-4">
-                {categoryEntries.map(([category, value], i) => (
-                  <div key={category} className="flex-1 flex flex-col items-center gap-2 group cursor-pointer h-full">
-                    <div className="w-full flex items-end justify-center h-full bg-white/5 rounded-t-lg overflow-hidden relative">
-                      <motion.div initial={{ height: 0 }} animate={{ height: `${(Number(value) / maxCategoryValue) * 100}%` }} transition={{ delay: i * 0.1, type: "spring" }} className="w-full bg-blue-500/50 group-hover:bg-blue-400 transition-colors" />
-                    </div>
-                    <span className="text-[9px] text-gray-600 font-mono truncate max-w-full">{category}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </SpotlightCard>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 md:gap-6">
+          <Card>
+            <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Gastos por Categoria</CardTitle></CardHeader>
+            <CardContent>
+              {donutData.length === 0 ? (
+                <p className="py-10 text-center text-xs text-muted-foreground">Sem despesas registradas ainda.</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={260}>
+                  <PieChart>
+                    <Pie data={donutData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={90} paddingAngle={2} isAnimationActive animationDuration={500}>
+                      {donutData.map((entry) => (
+                        <Cell key={entry.name} fill={categoryColor(entry.name)} stroke="var(--card)" strokeWidth={2} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<ChartTooltip />} />
+                    <Legend
+                      verticalAlign="bottom"
+                      formatter={(value) => <span className="text-xs text-muted-foreground">{value}</span>}
+                      iconSize={8}
+                      iconType="circle"
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
 
-          <SpotlightCard className="lg:col-span-1 p-5 md:p-6 flex flex-col">
-            <span className="text-[10px] font-black uppercase text-gray-500 tracking-widest mb-4">Últimas Transações</span>
-            <div className="flex-1 space-y-4">
-              {transactions.length === 0 && <p className="text-xs text-gray-600">Nenhuma transação ainda.</p>}
+          <Card>
+            <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Comparativo Mês a Mês</CardTitle></CardHeader>
+            <CardContent>
+              {comparisonData.length === 0 ? (
+                <p className="py-10 text-center text-xs text-muted-foreground">Sem dados suficientes ainda.</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={comparisonData} barCategoryGap="25%">
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                    <XAxis dataKey="category" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={{ stroke: "var(--border)" }} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={36} />
+                    <Tooltip content={<ChartTooltip />} cursor={{ fill: "var(--muted)", opacity: 0.4 }} />
+                    <Legend formatter={(value) => <span className="text-xs text-muted-foreground">{value}</span>} iconSize={8} iconType="circle" />
+                    <Bar dataKey="Mês anterior" fill="var(--muted-foreground)" radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive animationDuration={500} />
+                    <Bar dataKey="Este mês" fill="var(--primary)" radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive animationDuration={500} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 md:gap-6">
+          <Card className="lg:col-span-2">
+            <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Últimas Transações</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {transactions.length === 0 && <p className="text-xs text-muted-foreground">Nenhuma transação ainda.</p>}
               {transactions.map((t) => (
-                <div key={t.id} className="flex justify-between items-center group">
-                  <div className="flex items-center gap-3 min-w-0 pr-2">
-                    <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center ${t.type === "income" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
-                      {t.type === "income" ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                <div key={t.id} className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div
+                      className="flex size-8 shrink-0 items-center justify-center rounded-full"
+                      style={{ background: `color-mix(in oklch, ${categoryColor(t.category)} 18%, transparent)`, color: categoryColor(t.category) }}
+                    >
+                      {t.type === "income" ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-bold text-white group-hover:text-blue-300 transition-colors truncate">{t.description}</p>
-                      <p className="text-[9px] text-gray-600 truncate">{t.category}</p>
+                      <p className="truncate text-sm font-medium">{t.description}</p>
+                      <p className="text-xs text-muted-foreground">{t.category}</p>
                     </div>
                   </div>
-                  <span className={`text-[10px] md:text-xs font-mono shrink-0 ${t.type === "income" ? "text-green-400" : "text-white"}`}>
+                  <span className={cn("shrink-0 text-sm font-medium tabular-nums", t.type === "income" ? "text-emerald-500" : "text-foreground")}>
                     {t.type === "income" ? "+" : "-"} {formatBRL(t.amount)}
                   </span>
                 </div>
               ))}
-            </div>
-          </SpotlightCard>
-        </div>
+            </CardContent>
+          </Card>
 
-        {stats && stats.budgets.length > 0 && (
-          <SpotlightCard className="p-5 md:p-6">
-            <span className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Orçamentos</span>
-            <div className="mt-4 space-y-3">
-              {stats.budgets.map((b) => (
-                <div key={b.category}>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-gray-300">{b.category}</span>
-                    <span className={b.over_budget ? "text-red-400" : "text-gray-500"}>{formatBRL(b.spent_this_month)} / {formatBRL(b.monthly_limit)}</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                    <div className={`h-full ${b.over_budget ? "bg-red-500" : "bg-blue-500"}`} style={{ width: `${Math.min(100, b.percent_used)}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </SpotlightCard>
-        )}
+          <Card>
+            <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Orçamentos</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              {!stats || stats.budgets.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Nenhum orçamento definido.</p>
+              ) : (
+                stats.budgets.map((b) => {
+                  const statusClass = b.over_budget
+                    ? "[&>[data-slot=progress-indicator]]:bg-[#d03b3b]"
+                    : b.percent_used >= 75
+                      ? "[&>[data-slot=progress-indicator]]:bg-[#fab219]"
+                      : "[&>[data-slot=progress-indicator]]:bg-[#0ca30c]";
+                  return (
+                    <div key={b.category}>
+                      <div className="mb-1.5 flex justify-between text-xs">
+                        <span className="font-medium">{b.category}</span>
+                        <span className={cn("tabular-nums", b.over_budget && "text-destructive")}>
+                          {formatBRL(b.spent_this_month)} / {formatBRL(b.monthly_limit)}
+                        </span>
+                      </div>
+                      <Progress value={Math.min(100, b.percent_used)} className={cn("h-1.5", statusClass)} />
+                    </div>
+                  );
+                })
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </motion.div>
+    </div>
   );
 }

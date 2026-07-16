@@ -1,9 +1,14 @@
 import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { LogOut, Server, ShieldCheck } from "lucide-react";
-import { motion } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom";
-import { HeaderBack, SpotlightCard, useBackendStatus } from "../components/ui/primitives";
-import { useStore } from "../store/useStore";
+import { PageHeader } from "@/components/PageHeader";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
+import { useBackendStatus } from "@/components/ui/primitives";
+import { useStore } from "@/store/useStore";
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -19,61 +24,65 @@ export default function SettingsPage() {
   };
 
   return (
-    <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.25 }} className="w-full h-full flex flex-col bg-transparent overflow-y-auto overflow-x-hidden custom-scrollbar">
-      <HeaderBack title="Configurações do Sistema" onBack={() => navigate("/")} />
-      <div className="flex-1 px-4 md:px-6 pb-40 max-w-4xl mx-auto w-full space-y-4 md:space-y-6">
-        <SpotlightCard className={`p-5 md:p-6 border ${isBackendOnline ? "border-green-500/20" : "border-red-500/30"}`}>
-          <div className="flex items-center gap-3 md:gap-4">
-            <div className={`p-2 md:p-3 shrink-0 rounded-full ${isBackendOnline ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
-              <Server size={20} className="md:w-6 md:h-6" />
+    <div className="h-full w-full overflow-y-auto overflow-x-hidden pb-28">
+      <PageHeader title="Configurações" onBack={() => navigate("/")} />
+      <div className="mx-auto w-full max-w-2xl space-y-4 px-4 md:space-y-6 md:px-6">
+        <Card>
+          <CardContent className="flex items-center gap-3 pt-1">
+            <div className={`flex size-9 items-center justify-center rounded-full ${isBackendOnline ? "bg-emerald-500/10 text-emerald-500" : "bg-destructive/10 text-destructive"}`}>
+              <Server size={16} />
             </div>
             <div className="min-w-0">
-              <h2 className="text-xs md:text-sm font-bold uppercase tracking-widest text-white truncate">Estado do Núcleo Backend</h2>
-              <p className="text-[9px] md:text-[10px] text-gray-500 mt-1 line-clamp-2 md:line-clamp-1">
-                {isBackendOnline ? "Comunicação estabelecida com sucesso." : "Servidor Python está offline. Execute o ficheiro main.py."}
+              <p className="text-sm font-medium">Estado do backend</p>
+              <p className="text-xs text-muted-foreground">
+                {isBackendOnline ? "Comunicação estabelecida com sucesso." : "Servidor Python offline. Execute main.py."}
               </p>
             </div>
-          </div>
-        </SpotlightCard>
+          </CardContent>
+        </Card>
 
-        <SpotlightCard className="p-5 md:p-6">
-          <h2 className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 md:mb-6">Conta</h2>
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between"><span className="text-gray-500">Username</span><span className="text-white font-mono">{user?.username}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Email</span><span className="text-white font-mono truncate ml-4">{user?.email}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Papel</span><span className="text-white font-mono">{user?.role}</span></div>
-          </div>
-          {user?.role === "admin" && (
-            <Link to="/admin" className="mt-4 flex items-center gap-2 text-xs text-blue-400 hover:text-blue-300">
-              <ShieldCheck size={14} /> Painel de administração
-            </Link>
-          )}
-          <button onClick={handleLogout} className="mt-6 w-full flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-bold uppercase py-3 rounded-xl transition-colors">
-            <LogOut size={14} /> Sair
-          </button>
-        </SpotlightCard>
+        <Card>
+          <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Conta</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Username</span><span className="font-medium">{user?.username}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Email</span><span className="truncate font-medium">{user?.email}</span></div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Papel</span>
+              <Badge variant="outline">{user?.role}</Badge>
+            </div>
+            {user?.role === "admin" && (
+              <>
+                <Separator />
+                <Button variant="outline" asChild className="w-full gap-2">
+                  <Link to="/admin"><ShieldCheck size={14} /> Painel de administração</Link>
+                </Button>
+              </>
+            )}
+            <Button variant="destructive" onClick={handleLogout} className="w-full gap-2">
+              <LogOut size={14} /> Sair
+            </Button>
+          </CardContent>
+        </Card>
 
-        <SpotlightCard className="p-5 md:p-6">
-          <h2 className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 md:mb-6">Preferências</h2>
-          <div className="space-y-3 md:space-y-4">
+        <Card>
+          <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Preferências</CardTitle></CardHeader>
+          <CardContent className="space-y-1">
             {[
-              { title: "Foco Estrito", desc: "Bloqueia distrações", active: toggles[0] },
-              { title: "Áudio", desc: "Avisos sonoros", active: toggles[1] },
-              { title: "Animações", desc: "Efeitos avançados", active: toggles[2] },
+              { title: "Foco Estrito", desc: "Bloqueia distrações" },
+              { title: "Áudio", desc: "Avisos sonoros" },
+              { title: "Animações", desc: "Efeitos de transição" },
             ].map((item, i) => (
-              <div key={i} onClick={() => handleToggle(i)} className="cursor-pointer flex items-center justify-between p-3 md:p-4 bg-white/[0.02] border border-white/5 rounded-xl hover:border-white/10 transition-colors">
-                <div className="pr-2">
-                  <h4 className="text-xs md:text-sm font-bold text-white truncate">{item.title}</h4>
-                  <p className="text-[9px] md:text-[10px] text-gray-500 mt-0.5 truncate">{item.desc}</p>
+              <div key={item.title} className="flex items-center justify-between py-2.5">
+                <div>
+                  <p className="text-sm font-medium">{item.title}</p>
+                  <p className="text-xs text-muted-foreground">{item.desc}</p>
                 </div>
-                <div className={`w-8 h-4 md:w-10 md:h-5 shrink-0 rounded-full flex items-center px-1 transition-colors ${item.active ? "bg-blue-500" : "bg-gray-700"}`}>
-                  <div className={`w-2.5 h-2.5 md:w-3 md:h-3 bg-white rounded-full transition-transform ${item.active ? "translate-x-3.5 md:translate-x-5" : "translate-x-0"}`} />
-                </div>
+                <Switch checked={toggles[i]} onCheckedChange={() => handleToggle(i)} />
               </div>
             ))}
-          </div>
-        </SpotlightCard>
+          </CardContent>
+        </Card>
       </div>
-    </motion.div>
+    </div>
   );
 }

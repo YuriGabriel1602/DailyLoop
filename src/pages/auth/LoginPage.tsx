@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api, ApiError } from "../../lib/api";
-import { useStore } from "../../store/useStore";
+import { api, ApiError } from "@/lib/api";
+import { useStore } from "@/store/useStore";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -30,47 +34,33 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="h-screen w-screen flex items-center justify-center bg-[#050505] text-white p-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm bg-[#0a0a0b] border border-white/10 rounded-3xl p-8 space-y-5">
-        <div>
-          <h1 className="text-xl font-bold">Entrar no DailyLoop</h1>
-          <p className="text-sm text-gray-500 mt-1">Acesse sua conta pra continuar.</p>
-        </div>
-
-        {error && (
-          <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">{error}</div>
-        )}
-
-        <div className="space-y-3">
-          <input
-            value={usernameOrEmail}
-            onChange={(e) => setUsernameOrEmail(e.target.value)}
-            placeholder="Username ou email"
-            autoFocus
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500/50"
-          />
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Senha"
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500/50"
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-white text-black font-semibold rounded-xl py-3 text-sm disabled:opacity-50"
-        >
-          {loading ? "Entrando..." : "Entrar"}
-        </button>
-
-        <div className="flex justify-between text-xs text-gray-500">
-          <Link to="/forgot-password" className="hover:text-white">Esqueci minha senha</Link>
-          <Link to="/register" className="hover:text-white">Criar conta</Link>
-        </div>
-      </form>
+    <div className="flex h-screen w-screen items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle>Entrar no DailyLoop</CardTitle>
+          <CardDescription>Acesse sua conta para continuar.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>}
+            <div className="space-y-1.5">
+              <Label htmlFor="usernameOrEmail">Username ou email</Label>
+              <Input id="usernameOrEmail" autoFocus value={usernameOrEmail} onChange={(e) => setUsernameOrEmail(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="password">Senha</Label>
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
+            <Button type="submit" disabled={loading} className="w-full">
+              {loading ? "Entrando..." : "Entrar"}
+            </Button>
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <Link to="/forgot-password" className="hover:text-foreground">Esqueci minha senha</Link>
+              <Link to="/register" className="hover:text-foreground">Criar conta</Link>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

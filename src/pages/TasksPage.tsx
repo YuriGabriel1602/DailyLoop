@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { CheckCircle2, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../lib/api";
-import { HeaderBack, SpotlightCard } from "../components/ui/primitives";
+import { api } from "@/lib/api";
+import { PageHeader } from "@/components/PageHeader";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 interface Task {
   id: number;
@@ -20,10 +24,7 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
 
   const loadTasks = () => {
-    api
-      .get<Task[]>("/api/tasks")
-      .then(setTasks)
-      .finally(() => setLoading(false));
+    api.get<Task[]>("/api/tasks").then(setTasks).finally(() => setLoading(false));
   };
 
   useEffect(loadTasks, []);
@@ -46,49 +47,53 @@ export default function TasksPage() {
   };
 
   return (
-    <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.25 }} className="w-full h-full flex flex-col bg-transparent overflow-y-auto overflow-x-hidden custom-scrollbar">
-      <HeaderBack title="Tarefas" onBack={() => navigate("/")} />
-      <div className="flex-1 px-4 md:px-6 pb-40 max-w-4xl mx-auto w-full space-y-6 md:space-y-8">
-        <SpotlightCard className="p-2 flex gap-2 items-center focus-within:border-blue-500/50 transition-colors">
-          <input
+    <div className="flex h-full w-full flex-col overflow-y-auto overflow-x-hidden pb-28">
+      <PageHeader title="Tarefas" onBack={() => navigate("/")} />
+      <div className="mx-auto w-full max-w-2xl flex-1 space-y-6 px-4 md:px-6">
+        <Card className="flex-row items-center gap-2 p-2">
+          <Input
             value={newTaskTitle}
             onChange={(e) => setNewTaskTitle(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addTask()}
-            placeholder="Qual o próximo alvo tático?..."
-            className="flex-1 bg-transparent px-3 md:px-4 py-2 md:py-3 text-sm md:text-base text-white focus:outline-none placeholder:text-gray-600"
+            placeholder="O que precisa ser feito?"
+            className="border-none shadow-none focus-visible:ring-0"
           />
-          <button onClick={addTask} className="p-2 md:p-3 bg-white hover:bg-gray-200 text-black rounded-xl transition-colors shrink-0"><Plus size={18} /></button>
-        </SpotlightCard>
+          <Button size="icon" onClick={addTask} className="shrink-0">
+            <Plus size={16} />
+          </Button>
+        </Card>
 
         {loading ? (
-          <p className="text-xs text-gray-500 text-center">Carregando...</p>
+          <p className="text-center text-sm text-muted-foreground">Carregando...</p>
         ) : tasks.length === 0 ? (
-          <p className="text-xs text-gray-500 text-center">Nenhuma tarefa ainda.</p>
+          <p className="text-center text-sm text-muted-foreground">Nenhuma tarefa ainda.</p>
         ) : (
-          <div className="space-y-3">
-            <AnimatePresence>
-              {tasks.map((task, i) => (
-                <motion.div key={task.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} transition={{ delay: i * 0.05, duration: 0.2 }}>
-                  <SpotlightCard className={`p-4 md:p-5 flex items-center justify-between transition-all duration-300 group border-transparent hover:border-white/10 ${task.completed ? "opacity-50" : ""}`} noPadding>
-                    <div className="flex items-center gap-3 md:gap-4 min-w-0 pr-2">
-                      <button onClick={() => toggleTask(task)} className={`w-5 h-5 md:w-6 md:h-6 shrink-0 rounded-full border-2 flex items-center justify-center transition-colors ${task.completed ? "bg-green-500 border-green-500" : "border-gray-600 hover:border-gray-400"}`}>
-                        {task.completed && <CheckCircle2 size={12} className="text-black" />}
-                      </button>
-                      <div className="min-w-0">
-                        <h3 className={`text-xs md:text-sm font-bold transition-all truncate ${task.completed ? "text-gray-500 line-through" : "text-white"}`}>{task.title}</h3>
-                        <span className="text-[9px] uppercase tracking-widest text-blue-400/80 mt-1 font-mono">{task.category}</span>
-                      </div>
-                    </div>
-                    <button onClick={() => deleteTask(task.id)} className="w-8 h-8 shrink-0 rounded-full bg-white/5 hover:bg-red-500/20 text-gray-600 hover:text-red-500 flex items-center justify-center transition-colors md:opacity-0 group-hover:opacity-100">
-                      <Trash2 size={14} />
-                    </button>
-                  </SpotlightCard>
-                </motion.div>
-              ))}
-            </AnimatePresence>
+          <div className="space-y-2">
+            {tasks.map((task) => (
+              <Card key={task.id} className={cn("flex-row items-center justify-between gap-3 p-3", task.completed && "opacity-60")}>
+                <div className="flex min-w-0 items-center gap-3">
+                  <button
+                    onClick={() => toggleTask(task)}
+                    className={cn(
+                      "flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+                      task.completed ? "border-primary bg-primary" : "border-muted-foreground/40 hover:border-muted-foreground"
+                    )}
+                  >
+                    {task.completed && <div className="size-2 rounded-full bg-primary-foreground" />}
+                  </button>
+                  <div className="min-w-0">
+                    <p className={cn("truncate text-sm font-medium", task.completed && "line-through")}>{task.title}</p>
+                    <Badge variant="outline" className="mt-0.5">{task.category}</Badge>
+                  </div>
+                </div>
+                <Button variant="ghost" size="icon-sm" onClick={() => deleteTask(task.id)} className="shrink-0 text-muted-foreground hover:text-destructive">
+                  <Trash2 size={14} />
+                </Button>
+              </Card>
+            ))}
           </div>
         )}
       </div>
-    </motion.div>
+    </div>
   );
 }

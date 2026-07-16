@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api } from "@/lib/api";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -19,43 +23,33 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="h-screen w-screen flex items-center justify-center bg-[#050505] text-white p-4">
-      <div className="w-full max-w-sm bg-[#0a0a0b] border border-white/10 rounded-3xl p-8 space-y-5">
-        <div>
-          <h1 className="text-xl font-bold">Esqueci minha senha</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Informe seu email — se existir uma conta, enviaremos um link de redefinição.
+    <div className="flex h-screen w-screen items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle>Esqueci minha senha</CardTitle>
+          <CardDescription>Informe seu email — se existir uma conta, enviaremos um link de redefinição.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {sent ? (
+            <p className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600 dark:text-emerald-400">
+              Se o email existir, o link de redefinição foi enviado.
+            </p>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" type="email" autoFocus value={email} onChange={(e) => setEmail(e.target.value)} />
+              </div>
+              <Button type="submit" disabled={loading} className="w-full">
+                {loading ? "Enviando..." : "Enviar link"}
+              </Button>
+            </form>
+          )}
+          <p className="mt-4 text-center text-xs text-muted-foreground">
+            <Link to="/login" className="underline underline-offset-4 hover:text-foreground">Voltar ao login</Link>
           </p>
-        </div>
-
-        {sent ? (
-          <div className="text-sm text-green-400 bg-green-500/10 border border-green-500/20 rounded-xl px-4 py-3">
-            Se o email existir, o link de redefinição foi enviado.
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email"
-              autoFocus
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500/50"
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-white text-black font-semibold rounded-xl py-3 text-sm disabled:opacity-50"
-            >
-              {loading ? "Enviando..." : "Enviar link"}
-            </button>
-          </form>
-        )}
-
-        <div className="text-xs text-gray-500 text-center">
-          <Link to="/login" className="hover:text-white underline">Voltar ao login</Link>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

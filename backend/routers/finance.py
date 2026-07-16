@@ -414,6 +414,8 @@ def get_stats(
             "previous_month": f"{previous_month_key[0]}-{previous_month_key[1]:02d}",
             "total_change_percent": percent_change(current_month_total, previous_month_total),
             "by_category_change_percent": by_category_change,
+            "current_month_by_category": current_month_by_category,
+            "previous_month_by_category": previous_month_by_category,
         },
         "projection": {
             "spent_so_far": spent_so_far_this_month,

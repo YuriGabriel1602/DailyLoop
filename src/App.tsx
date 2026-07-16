@@ -12,6 +12,7 @@ import FinancePage from "./pages/FinancePage";
 import HivePage from "./pages/HivePage";
 import SettingsPage from "./pages/SettingsPage";
 import AdminPage from "./pages/AdminPage";
+import { Toaster } from "@/components/ui/sonner";
 
 const RequireAuth = ({ children }: { children: ReactNode }) => {
   const token = useStore((s) => s.token);
@@ -29,7 +30,8 @@ const RequireAdmin = ({ children }: { children: ReactNode }) => {
 
 function App() {
   return (
-    <div className="h-screen w-screen overflow-hidden bg-[#050505] text-white selection:bg-blue-500/30">
+    <div className="h-screen w-screen overflow-hidden bg-background text-foreground selection:bg-primary/30">
+      <Toaster richColors position="top-center" />
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />

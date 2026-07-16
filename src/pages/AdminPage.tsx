@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import { RefreshCw, ShieldOff, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../lib/api";
-import { HeaderBack, SpotlightCard } from "../components/ui/primitives";
+import { RefreshCw, ShieldOff, Trash2 } from "lucide-react";
+import { api } from "@/lib/api";
+import { PageHeader } from "@/components/PageHeader";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface AdminUser {
   id: number;
@@ -43,45 +48,69 @@ export default function AdminPage() {
   };
 
   return (
-    <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.25 }} className="w-full h-full flex flex-col bg-transparent overflow-y-auto overflow-x-hidden custom-scrollbar">
-      <HeaderBack title="Administração" onBack={() => navigate("/")} />
-      <div className="flex-1 px-4 md:px-6 pb-40 max-w-5xl mx-auto w-full space-y-4 md:space-y-6">
-        <SpotlightCard className="p-5 md:p-6">
-          <h2 className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">Usuários</h2>
-          <div className="space-y-3">
-            {users.map((u) => (
-              <div key={u.id} className="flex flex-wrap items-center justify-between gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl">
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-white truncate">{u.username} <span className="text-gray-500 font-normal">({u.email})</span></p>
-                  <p className={`text-[10px] uppercase font-mono mt-0.5 ${u.is_active ? "text-green-400" : "text-red-400"}`}>{u.is_active ? "ativo" : "desativado"}</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <select value={u.role} onChange={(e) => changeRole(u, e.target.value as "user" | "admin")} className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white">
-                    <option value="user">user</option>
-                    <option value="admin">admin</option>
-                  </select>
-                  <button onClick={() => toggleActive(u)} className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300" title={u.is_active ? "Desativar" : "Ativar"}>
-                    <ShieldOff size={14} />
-                  </button>
-                  <button onClick={() => deleteUser(u)} className="p-2 bg-white/5 hover:bg-red-500/20 hover:text-red-400 rounded-lg text-gray-300">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </SpotlightCard>
+    <div className="h-full w-full overflow-y-auto overflow-x-hidden pb-28">
+      <PageHeader title="Administração" onBack={() => navigate("/")} />
+      <div className="mx-auto w-full max-w-5xl space-y-4 px-4 md:space-y-6 md:px-6">
+        <Card>
+          <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Usuários</CardTitle></CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Usuário</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Papel</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {users.map((u) => (
+                  <TableRow key={u.id}>
+                    <TableCell>
+                      <p className="font-medium">{u.username}</p>
+                      <p className="text-xs text-muted-foreground">{u.email}</p>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={u.is_active ? "secondary" : "destructive"}>{u.is_active ? "ativo" : "desativado"}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Select value={u.role} onValueChange={(v) => changeRole(u, v as "user" | "admin")}>
+                        <SelectTrigger size="sm" className="w-28"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="user">user</SelectItem>
+                          <SelectItem value="admin">admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon-sm" onClick={() => toggleActive(u)} title={u.is_active ? "Desativar" : "Ativar"}>
+                        <ShieldOff size={14} />
+                      </Button>
+                      <Button variant="ghost" size="icon-sm" onClick={() => deleteUser(u)} className="text-muted-foreground hover:text-destructive">
+                        <Trash2 size={14} />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
 
-        <SpotlightCard className="p-5 md:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-widest">Logs do sistema</h2>
-            <button onClick={loadLogs} className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300"><RefreshCw size={14} /></button>
-          </div>
-          <div className="bg-black/40 rounded-xl p-3 max-h-80 overflow-y-auto custom-scrollbar font-mono text-[10px] text-gray-400 space-y-0.5">
-            {logs.length === 0 ? <p>Sem logs ainda.</p> : logs.map((line, i) => <p key={i} className="whitespace-pre-wrap break-all">{line}</p>)}
-          </div>
-        </SpotlightCard>
+        <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Logs do sistema</CardTitle>
+            <Button variant="ghost" size="icon-sm" onClick={loadLogs}><RefreshCw size={14} /></Button>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-72 rounded-lg border bg-muted/30 p-3">
+              <div className="space-y-0.5 font-mono text-[11px] text-muted-foreground">
+                {logs.length === 0 ? <p>Sem logs ainda.</p> : logs.map((line, i) => <p key={i} className="break-all whitespace-pre-wrap">{line}</p>)}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
       </div>
-    </motion.div>
+    </div>
   );
 }
