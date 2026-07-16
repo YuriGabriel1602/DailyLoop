@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
@@ -35,3 +35,17 @@ def list_notes(
         .order_by(Note.id.desc())
     )
     return session.exec(statement).all()
+
+
+@router.delete("/{note_id}")
+def delete_note(
+    note_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    db_note = session.get(Note, note_id)
+    if not db_note or db_note.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Nota não encontrada")
+    session.delete(db_note)
+    session.commit()
+    return {"status": "deleted"}

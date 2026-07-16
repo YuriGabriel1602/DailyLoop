@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  Bot, CheckCircle2, Globe, Home, LogOut, Loader2, Send, Settings, ShieldCheck, User, Wallet,
+  Bot, CheckCircle2, Globe, Home, LogOut, Loader2, Send, Settings, ShieldCheck, StickyNote, User, Wallet,
 } from "lucide-react";
 import { api, ApiError, registerUnauthorizedHandler } from "@/lib/api";
 import { useStore } from "@/store/useStore";
@@ -117,6 +117,7 @@ const NAV_ITEMS = [
   { to: "/", icon: Home, label: "Painel", end: true },
   { to: "/tasks", icon: CheckCircle2, label: "Tarefas" },
   { to: "/finance", icon: Wallet, label: "Finanças" },
+  { to: "/notes", icon: StickyNote, label: "Notas" },
   { to: "/hive", icon: Globe, label: "The Hive" },
   { to: "/settings", icon: Settings, label: "Sistema" },
 ];

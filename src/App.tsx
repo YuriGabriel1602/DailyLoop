@@ -10,6 +10,7 @@ import LandingPage from "./pages/LandingPage";
 import HomePage from "./pages/HomePage";
 import TasksPage from "./pages/TasksPage";
 import FinancePage from "./pages/FinancePage";
+import NotesPage from "./pages/NotesPage";
 import HivePage from "./pages/HivePage";
 import SettingsPage from "./pages/SettingsPage";
 import AdminPage from "./pages/AdminPage";
@@ -51,6 +52,7 @@ function App() {
             <Route index element={<HomePage />} />
             <Route path="tasks" element={<TasksPage />} />
             <Route path="finance" element={<FinancePage />} />
+            <Route path="notes" element={<NotesPage />} />
             <Route path="hive" element={<HivePage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route
