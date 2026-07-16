@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface AdminUser {
   id: number;
@@ -20,8 +21,8 @@ interface AdminUser {
 
 export default function AdminPage() {
   const navigate = useNavigate();
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [logs, setLogs] = useState<string[]>([]);
+  const [users, setUsers] = useState<AdminUser[] | null>(null);
+  const [logs, setLogs] = useState<string[] | null>(null);
 
   const loadUsers = () => api.get<AdminUser[]>("/api/admin/users").then(setUsers);
   const loadLogs = () => api.get<{ lines: string[] }>("/api/admin/logs?lines=200").then((r) => setLogs(r.lines));
@@ -33,18 +34,18 @@ export default function AdminPage() {
 
   const toggleActive = async (u: AdminUser) => {
     const updated = await api.patch<AdminUser>(`/api/admin/users/${u.id}`, { is_active: !u.is_active });
-    setUsers((prev) => prev.map((x) => (x.id === u.id ? updated : x)));
+    setUsers((prev) => (prev ?? []).map((x) => (x.id === u.id ? updated : x)));
   };
 
   const changeRole = async (u: AdminUser, role: "user" | "admin") => {
     const updated = await api.patch<AdminUser>(`/api/admin/users/${u.id}`, { role });
-    setUsers((prev) => prev.map((x) => (x.id === u.id ? updated : x)));
+    setUsers((prev) => (prev ?? []).map((x) => (x.id === u.id ? updated : x)));
   };
 
   const deleteUser = async (u: AdminUser) => {
     if (!confirm(`Excluir a conta de ${u.username}?`)) return;
     await api.delete(`/api/admin/users/${u.id}`);
-    setUsers((prev) => prev.filter((x) => x.id !== u.id));
+    setUsers((prev) => (prev ?? []).filter((x) => x.id !== u.id));
   };
 
   return (
@@ -54,6 +55,11 @@ export default function AdminPage() {
         <Card>
           <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Usuários</CardTitle></CardHeader>
           <CardContent>
+            {!users ? (
+              <div className="space-y-2">
+                {[0, 1, 2].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
+              </div>
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -94,6 +100,7 @@ export default function AdminPage() {
                 ))}
               </TableBody>
             </Table>
+            )}
           </CardContent>
         </Card>
 
@@ -104,9 +111,13 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent>
             <ScrollArea className="h-72 rounded-lg border bg-muted/30 p-3">
-              <div className="space-y-0.5 font-mono text-[11px] text-muted-foreground">
-                {logs.length === 0 ? <p>Sem logs ainda.</p> : logs.map((line, i) => <p key={i} className="break-all whitespace-pre-wrap">{line}</p>)}
-              </div>
+              {!logs ? (
+                <div className="space-y-1.5">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-3 w-full" />)}</div>
+              ) : (
+                <div className="space-y-0.5 font-mono text-[11px] text-muted-foreground">
+                  {logs.length === 0 ? <p>Sem logs ainda.</p> : logs.map((line, i) => <p key={i} className="break-all whitespace-pre-wrap">{line}</p>)}
+                </div>
+              )}
             </ScrollArea>
           </CardContent>
         </Card>

@@ -1,13 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  Bot, CheckCircle2, Fingerprint, Globe, Home, Loader2, Send, Settings, ShieldCheck, Wallet,
+  Bot, CheckCircle2, Fingerprint, Globe, Home, LogOut, Loader2, Send, Settings, ShieldCheck, User, Wallet,
 } from "lucide-react";
 import { api, ApiError, registerUnauthorizedHandler } from "@/lib/api";
 import { useStore } from "@/store/useStore";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/utils";
 
 interface ChatMessage {
@@ -151,10 +157,50 @@ const Dock = ({ onOpenPrometheus }: { onOpenPrometheus: () => void }) => {
   );
 };
 
+const TopBar = () => {
+  const user = useStore((s) => s.user);
+  const logout = useStore((s) => s.logout);
+  const navigate = useNavigate();
+
+  return (
+    <div className="flex shrink-0 items-center justify-between border-b bg-background/80 px-4 py-3 backdrop-blur-sm md:px-6">
+      <Logo />
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="flex items-center gap-2 rounded-full border py-1 pr-3 pl-1 text-sm transition-colors hover:bg-muted">
+            <Avatar className="size-6"><AvatarFallback className="text-[10px]">{user?.username?.charAt(0).toUpperCase()}</AvatarFallback></Avatar>
+            <span className="hidden max-w-[120px] truncate sm:inline">{user?.username}</span>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuLabel className="font-normal">
+            <p className="text-sm font-medium">{user?.username}</p>
+            <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => navigate("/settings")}>
+            <User size={14} /> Configurações
+          </DropdownMenuItem>
+          {user?.role === "admin" && (
+            <DropdownMenuItem onSelect={() => navigate("/admin")}>
+              <ShieldCheck size={14} /> Administração
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem variant="destructive" onSelect={() => { logout(); navigate("/login", { replace: true }); }}>
+            <LogOut size={14} /> Sair
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+};
+
 export const Layout = () => {
   const [isPrometheusOpen, setPrometheusOpen] = useState(false);
   const logout = useStore((s) => s.logout);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     registerUnauthorizedHandler(() => {
@@ -165,8 +211,29 @@ export const Layout = () => {
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-x-hidden bg-background">
+      <div
+        className="pointer-events-none fixed inset-0 z-0"
+        style={{
+          background:
+            "radial-gradient(circle at 15% 0%, color-mix(in oklch, var(--primary) 8%, transparent), transparent 45%)",
+        }}
+      />
       <div className="relative z-10 flex h-full flex-1 flex-col overflow-hidden">
-        <Outlet />
+        <TopBar />
+        <div className="relative flex-1 overflow-hidden">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="h-full"
+            >
+              <Outlet />
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </div>
       <Dock onOpenPrometheus={() => setPrometheusOpen(true)} />
       <PrometheusSheet isOpen={isPrometheusOpen} onClose={() => setPrometheusOpen(false)} />

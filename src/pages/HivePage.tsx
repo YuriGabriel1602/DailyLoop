@@ -44,7 +44,7 @@ export default function HivePage() {
           </Card>
 
           {posts.map((post) => (
-            <Card key={post.id}>
+            <Card key={post.id} className="transition-shadow hover:shadow-md">
               <CardHeader>
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-3">

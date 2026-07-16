@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { CheckCircle2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AuthLayout } from "./AuthLayout";
 
 export default function ResetPasswordPage() {
   const { token } = useParams<{ token: string }>();
@@ -30,34 +31,31 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="flex h-screen w-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Redefinir senha</CardTitle>
-          <CardDescription>Escolha uma nova senha para sua conta.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {error && <p className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>}
-          {success ? (
-            <p className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600 dark:text-emerald-400">
-              Senha redefinida! Levando você ao login...
-            </p>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="password">Nova senha</Label>
-                <Input id="password" type="password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 8 caracteres" />
-              </div>
-              <Button type="submit" disabled={loading || !token} className="w-full">
-                {loading ? "Redefinindo..." : "Redefinir senha"}
-              </Button>
-            </form>
-          )}
-          <p className="mt-4 text-center text-xs text-muted-foreground">
-            <Link to="/login" className="underline underline-offset-4 hover:text-foreground">Voltar ao login</Link>
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    <AuthLayout>
+      <div className="mb-6 space-y-1.5">
+        <h2 className="text-xl font-semibold tracking-tight">Redefinir senha</h2>
+        <p className="text-sm text-muted-foreground">Escolha uma nova senha para sua conta.</p>
+      </div>
+      {error && <p className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>}
+      {success ? (
+        <div className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600 dark:text-emerald-400">
+          <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
+          <span>Senha redefinida! Levando você ao login...</span>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="password">Nova senha</Label>
+            <Input id="password" type="password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 8 caracteres" />
+          </div>
+          <Button type="submit" disabled={loading || !token} className="w-full">
+            {loading ? "Redefinindo..." : "Redefinir senha"}
+          </Button>
+        </form>
+      )}
+      <p className="mt-4 text-center text-xs text-muted-foreground">
+        <Link to="/login" className="underline underline-offset-4 hover:text-foreground">Voltar ao login</Link>
+      </p>
+    </AuthLayout>
   );
 }

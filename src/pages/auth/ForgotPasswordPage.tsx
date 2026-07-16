@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { CheckCircle2 } from "lucide-react";
 import { api } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AuthLayout } from "./AuthLayout";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -23,33 +24,30 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="flex h-screen w-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Esqueci minha senha</CardTitle>
-          <CardDescription>Informe seu email — se existir uma conta, enviaremos um link de redefinição.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {sent ? (
-            <p className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600 dark:text-emerald-400">
-              Se o email existir, o link de redefinição foi enviado.
-            </p>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" autoFocus value={email} onChange={(e) => setEmail(e.target.value)} />
-              </div>
-              <Button type="submit" disabled={loading} className="w-full">
-                {loading ? "Enviando..." : "Enviar link"}
-              </Button>
-            </form>
-          )}
-          <p className="mt-4 text-center text-xs text-muted-foreground">
-            <Link to="/login" className="underline underline-offset-4 hover:text-foreground">Voltar ao login</Link>
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    <AuthLayout>
+      <div className="mb-6 space-y-1.5">
+        <h2 className="text-xl font-semibold tracking-tight">Esqueci minha senha</h2>
+        <p className="text-sm text-muted-foreground">Informe seu email — se existir uma conta, enviaremos um link de redefinição.</p>
+      </div>
+      {sent ? (
+        <div className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600 dark:text-emerald-400">
+          <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
+          <span>Se o email existir, o link de redefinição foi enviado.</span>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="email">Email</Label>
+            <Input id="email" type="email" autoFocus value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <Button type="submit" disabled={loading} className="w-full">
+            {loading ? "Enviando..." : "Enviar link"}
+          </Button>
+        </form>
+      )}
+      <p className="mt-4 text-center text-xs text-muted-foreground">
+        <Link to="/login" className="underline underline-offset-4 hover:text-foreground">Voltar ao login</Link>
+      </p>
+    </AuthLayout>
   );
 }

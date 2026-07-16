@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { TrendingDown, TrendingUp, Upload, Wallet } from "lucide-react";
+import { BarChart3, PieChart as PieIcon, Receipt, TrendingDown, TrendingUp, Upload, Wallet } from "lucide-react";
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { toast } from "sonner";
 import { api, ApiError } from "@/lib/api";
 import { PageHeader } from "@/components/PageHeader";
+import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
@@ -148,7 +150,13 @@ export default function FinancePage() {
               <CardTitle className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Wallet size={13} /> Saldo Total</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-semibold tracking-tight">{stats ? formatBRL(stats.balance) : "—"}</div>
+              {stats ? (
+                <div className="text-3xl font-semibold tracking-tight">
+                  <AnimatedNumber value={Number(stats.balance)} formatter={formatBRL} />
+                </div>
+              ) : (
+                <Skeleton className="h-9 w-32" />
+              )}
               {stats?.month_over_month.total_change_percent != null && (
                 <div className={cn("mt-2 flex items-center gap-1 text-xs", stats.month_over_month.total_change_percent >= 0 ? "text-destructive" : "text-emerald-500")}>
                   {stats.month_over_month.total_change_percent >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
@@ -159,11 +167,23 @@ export default function FinancePage() {
           </Card>
           <Card>
             <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Entradas</CardTitle></CardHeader>
-            <CardContent><div className="text-2xl font-semibold">{stats ? formatBRL(stats.income) : "—"}</div></CardContent>
+            <CardContent>
+              {stats ? (
+                <div className="text-2xl font-semibold"><AnimatedNumber value={Number(stats.income)} formatter={formatBRL} /></div>
+              ) : (
+                <Skeleton className="h-8 w-28" />
+              )}
+            </CardContent>
           </Card>
           <Card>
             <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Saídas</CardTitle></CardHeader>
-            <CardContent><div className="text-2xl font-semibold">{stats ? formatBRL(stats.expenses) : "—"}</div></CardContent>
+            <CardContent>
+              {stats ? (
+                <div className="text-2xl font-semibold"><AnimatedNumber value={Number(stats.expenses)} formatter={formatBRL} /></div>
+              ) : (
+                <Skeleton className="h-8 w-28" />
+              )}
+            </CardContent>
           </Card>
         </div>
 
@@ -189,8 +209,13 @@ export default function FinancePage() {
           <Card>
             <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Gastos por Categoria</CardTitle></CardHeader>
             <CardContent>
-              {donutData.length === 0 ? (
-                <p className="py-10 text-center text-xs text-muted-foreground">Sem despesas registradas ainda.</p>
+              {!stats ? (
+                <Skeleton className="mx-auto h-[220px] w-[220px] rounded-full" />
+              ) : donutData.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-14 text-center text-muted-foreground">
+                  <PieIcon size={22} className="opacity-40" />
+                  <p className="text-xs">Sem despesas registradas ainda.</p>
+                </div>
               ) : (
                 <ResponsiveContainer width="100%" height={260}>
                   <PieChart>
@@ -215,8 +240,13 @@ export default function FinancePage() {
           <Card>
             <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Comparativo Mês a Mês</CardTitle></CardHeader>
             <CardContent>
-              {comparisonData.length === 0 ? (
-                <p className="py-10 text-center text-xs text-muted-foreground">Sem dados suficientes ainda.</p>
+              {!stats ? (
+                <Skeleton className="h-[220px] w-full" />
+              ) : comparisonData.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-14 text-center text-muted-foreground">
+                  <BarChart3 size={22} className="opacity-40" />
+                  <p className="text-xs">Sem dados suficientes ainda.</p>
+                </div>
               ) : (
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={comparisonData} barCategoryGap="25%">
@@ -238,7 +268,12 @@ export default function FinancePage() {
           <Card className="lg:col-span-2">
             <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Últimas Transações</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              {transactions.length === 0 && <p className="text-xs text-muted-foreground">Nenhuma transação ainda.</p>}
+              {transactions.length === 0 && (
+                <div className="flex flex-col items-center gap-2 py-6 text-center text-muted-foreground">
+                  <Receipt size={22} className="opacity-40" />
+                  <p className="text-xs">Nenhuma transação ainda.</p>
+                </div>
+              )}
               {transactions.map((t) => (
                 <div key={t.id} className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
