@@ -8,7 +8,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlmodel import Session, select
 
 from database import Budget, Transaction, User, get_session
@@ -29,6 +29,14 @@ class TransactionCreate(BaseModel):
     type: str = "expense"
     category: Optional[str] = None
     date: Optional[date_type] = None
+
+    @field_validator("amount", mode="before")
+    @classmethod
+    def _normalize_amount(cls, value):
+        # Aceita tanto "45.90" quanto formato brasileiro "45,90" / "1.234,56".
+        if isinstance(value, str):
+            return _parse_amount(value)
+        return value
 
 
 @router.get("/transactions")
@@ -258,6 +266,13 @@ async def import_statement(
 class BudgetUpsert(BaseModel):
     category: str
     monthly_limit: Decimal
+
+    @field_validator("monthly_limit", mode="before")
+    @classmethod
+    def _normalize_monthly_limit(cls, value):
+        if isinstance(value, str):
+            return _parse_amount(value)
+        return value
 
 
 @router.get("/budgets")

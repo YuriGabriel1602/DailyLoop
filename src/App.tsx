@@ -1,32 +1,67 @@
-import { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import NeuralHandshake from "./components/NeuralHandshake";
-import { Dashboard } from "./components/Dashboard"; // <-- AQUI É QUE ELE CHAMA O DASHBOARD!
+import type { ReactNode } from "react";
+import { Navigate, Route, BrowserRouter, Routes } from "react-router-dom";
+import { Layout } from "./components/Layout";
+import { useStore } from "./store/useStore";
+import LoginPage from "./pages/auth/LoginPage";
+import RegisterPage from "./pages/auth/RegisterPage";
+import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
+import HomePage from "./pages/HomePage";
+import TasksPage from "./pages/TasksPage";
+import FinancePage from "./pages/FinancePage";
+import HivePage from "./pages/HivePage";
+import SettingsPage from "./pages/SettingsPage";
+import AdminPage from "./pages/AdminPage";
+
+const RequireAuth = ({ children }: { children: ReactNode }) => {
+  const token = useStore((s) => s.token);
+  if (!token) return <Navigate to="/login" replace />;
+  return children;
+};
+
+const RequireAdmin = ({ children }: { children: ReactNode }) => {
+  const token = useStore((s) => s.token);
+  const role = useStore((s) => s.user?.role);
+  if (!token) return <Navigate to="/login" replace />;
+  if (role !== "admin") return <Navigate to="/" replace />;
+  return children;
+};
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  const handleHandshakeComplete = () => {
-    setIsAuthenticated(true);
-  };
-
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#050505] text-white selection:bg-blue-500/30">
-      <AnimatePresence mode="wait">
-        {!isAuthenticated ? (
-          <NeuralHandshake key="login" onComplete={handleHandshakeComplete} />
-        ) : (
-          <motion.div
-            key="dashboard"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="relative w-full h-full"
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+
+          <Route
+            element={
+              <RequireAuth>
+                <Layout />
+              </RequireAuth>
+            }
           >
-            {/* Isto renderiza o seu ficheiro Dashboard.tsx! */}
-            <Dashboard /> 
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <Route index element={<HomePage />} />
+            <Route path="tasks" element={<TasksPage />} />
+            <Route path="finance" element={<FinancePage />} />
+            <Route path="hive" element={<HivePage />} />
+            <Route path="settings" element={<SettingsPage />} />
+            <Route
+              path="admin"
+              element={
+                <RequireAdmin>
+                  <AdminPage />
+                </RequireAdmin>
+              }
+            />
+          </Route>
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
     </div>
   );
 }
