@@ -41,6 +41,7 @@ class RegisterRequest(BaseModel):
     username: str = Field(min_length=3, max_length=50)
     email: str
     password: str = Field(min_length=8)
+    phone_number: str
 
 
 class LoginRequest(BaseModel):
@@ -62,9 +63,55 @@ def _validate_email(email: str):
         raise HTTPException(status_code=400, detail="Email inválido")
 
 
+def _normalize_e164(phone_number: str) -> str:
+    phone = phone_number.strip()
+    if not phone.startswith("+"):
+        raise HTTPException(status_code=400, detail="Telefone deve estar no formato E.164 (ex: +5511999999999)")
+    return phone
+
+
+def _issue_verification_code(session: Session, user: User, phone: str, *, enforce_cooldown: bool = True) -> bool:
+    """Gera um código, associa `phone` ao usuário como não-verificado e envia
+    via WhatsApp. Retorna se o envio foi confirmado pela Meta (False só
+    significa "não confirmado", o código ainda é válido e pode ser logado)."""
+    if enforce_cooldown:
+        recent = session.exec(
+            select(PhoneVerificationCode)
+            .where(PhoneVerificationCode.user_id == user.id)
+            .order_by(PhoneVerificationCode.created_at.desc())
+        ).first()
+        if recent and recent.created_at.replace(tzinfo=timezone.utc) > datetime.now(timezone.utc) - timedelta(
+            seconds=settings.phone_verification_resend_cooldown_seconds
+        ):
+            raise HTTPException(status_code=429, detail="Aguarde um pouco antes de pedir um novo código.")
+
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    session.add(
+        PhoneVerificationCode(
+            user_id=user.id,
+            phone_number=phone,
+            code=code,
+            expires_at=datetime.now(timezone.utc)
+            + timedelta(minutes=settings.phone_verification_code_expire_minutes),
+        )
+    )
+    user.phone_number = phone
+    user.phone_verified = False
+    user.whatsapp_opted_in = False
+    session.add(user)
+    session.commit()
+
+    sent = send_whatsapp_template(phone, settings.whatsapp_template_otp, [code])
+    if not sent:
+        # WhatsApp não configurado/recusado (modo dev): loga o código pra não travar o teste.
+        logger.info("Código de verificação (WhatsApp não configurado) para %s: %s", phone, code)
+    return sent
+
+
 @router.post("/register")
 def register(payload: RegisterRequest, session: Session = Depends(get_session)):
     _validate_email(payload.email)
+    phone = _normalize_e164(payload.phone_number)
 
     existing = session.exec(
         select(User).where(
@@ -85,8 +132,18 @@ def register(payload: RegisterRequest, session: Session = Depends(get_session)):
     session.commit()
     session.refresh(user)
 
+    # Dispara a verificação do telefone já na criação da conta — sem cooldown
+    # (é o primeiro código, não um reenvio).
+    whatsapp_sent = _issue_verification_code(session, user, phone, enforce_cooldown=False)
+    session.refresh(user)
+
     token = create_access_token(user.id, user.role)
-    return {"access_token": token, "token_type": "bearer", "user": _user_public(user)}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": _user_public(user),
+        "whatsapp_sent": whatsapp_sent,
+    }
 
 
 @router.post("/login")
@@ -140,13 +197,6 @@ def update_me(
     return _user_public(current_user)
 
 
-def _normalize_e164(phone_number: str) -> str:
-    phone = phone_number.strip()
-    if not phone.startswith("+"):
-        raise HTTPException(status_code=400, detail="Telefone deve estar no formato E.164 (ex: +5511999999999)")
-    return phone
-
-
 class PhoneRequestCodeRequest(BaseModel):
     phone_number: str
 
@@ -158,39 +208,7 @@ def request_phone_code(
     session: Session = Depends(get_session),
 ):
     phone = _normalize_e164(payload.phone_number)
-
-    recent = session.exec(
-        select(PhoneVerificationCode)
-        .where(PhoneVerificationCode.user_id == current_user.id)
-        .order_by(PhoneVerificationCode.created_at.desc())
-    ).first()
-    if recent and recent.created_at.replace(tzinfo=timezone.utc) > datetime.now(timezone.utc) - timedelta(
-        seconds=settings.phone_verification_resend_cooldown_seconds
-    ):
-        raise HTTPException(status_code=429, detail="Aguarde um pouco antes de pedir um novo código.")
-
-    code = f"{secrets.randbelow(1_000_000):06d}"
-    session.add(
-        PhoneVerificationCode(
-            user_id=current_user.id,
-            phone_number=phone,
-            code=code,
-            expires_at=datetime.now(timezone.utc)
-            + timedelta(minutes=settings.phone_verification_code_expire_minutes),
-        )
-    )
-    # Telefone fica associado mas NÃO verificado até o código ser confirmado.
-    current_user.phone_number = phone
-    current_user.phone_verified = False
-    current_user.whatsapp_opted_in = False
-    session.add(current_user)
-    session.commit()
-
-    sent = send_whatsapp_template(phone, settings.whatsapp_template_otp, [code])
-    if not sent:
-        # WhatsApp não configurado/recusado (modo dev): loga o código pra não travar o teste.
-        logger.info("Código de verificação (WhatsApp não configurado) para %s: %s", phone, code)
-
+    sent = _issue_verification_code(session, current_user, phone)
     return {"message": "Código enviado.", "whatsapp_sent": sent}
 
 

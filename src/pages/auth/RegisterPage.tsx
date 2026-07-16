@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, Loader2, Mail, User } from "lucide-react";
+import { ArrowRight, Loader2, Mail, Phone, User } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { useStore } from "@/store/useStore";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ export default function RegisterPage() {
   const setAuth = useStore((s) => s.setAuth);
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -24,9 +25,14 @@ export default function RegisterPage() {
     setError(null);
     setLoading(true);
     try {
-      const data = await api.post<{ access_token: string; user: any }>("/api/auth/register", { username, email, password });
+      const data = await api.post<{ access_token: string; user: any }>("/api/auth/register", {
+        username,
+        email,
+        password,
+        phone_number: phoneNumber,
+      });
       setAuth(data.user, data.access_token);
-      navigate("/", { replace: true });
+      navigate(data.user.phone_verified ? "/" : "/verify-phone", { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Falha ao criar conta.");
     } finally {
@@ -50,6 +56,17 @@ export default function RegisterPage() {
         <div className="space-y-1.5">
           <Label htmlFor="email">Email</Label>
           <InputWithIcon icon={Mail} id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="phoneNumber">WhatsApp (formato internacional)</Label>
+          <InputWithIcon
+            icon={Phone}
+            id="phoneNumber"
+            placeholder="+5511999999999"
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">Vamos mandar um código por WhatsApp pra confirmar.</p>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="password">Senha</Label>
