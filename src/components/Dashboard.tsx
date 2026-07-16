@@ -4,10 +4,10 @@ import {
   Home, CheckCircle2, Wallet, Bot, Settings,
   X, ArrowRight, Pause, Play, Sparkles, Cloud,
   MapPin, Music, Loader2, Globe, Send,
-  Headphones, ChevronLeft, Battery, Wifi, Car, ThermometerSun, 
-  Trash2, Fingerprint, Copy, Server, Disc, BrainCircuit, Terminal, 
-  Plus, Search, Youtube, Wind, Droplets, Sun, Star, AlertCircle, 
-  RefreshCw, TrendingUp, TrendingDown, Activity, Users, Bell, Command,
+  ChevronLeft, Battery, Wifi, Car, ThermometerSun,
+  Trash2, Fingerprint, Copy, Server, Disc, BrainCircuit, Terminal,
+  Plus, Search, Youtube, Wind, Droplets, Sun, Star, AlertCircle,
+  RefreshCw, TrendingUp, TrendingDown, Activity,
   MessageSquare, Zap, ImageIcon, Code, Hash
 } from 'lucide-react';
 
@@ -102,7 +102,7 @@ const useSpotify = (token: string | null) => {
         setError(null);
         if (data && data.item) { 
           // Só atualiza o estado se a música ou o status de pause mudou (evita re-renders pesados)
-          setCurrentTrack(prev => prev?.id === data.item.id ? prev : data.item); 
+          setCurrentTrack((prev: any) => prev?.id === data.item.id ? prev : data.item);
           setIsPaused(prev => prev === !data.is_playing ? prev : !data.is_playing);
         }
       }

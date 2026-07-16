@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Fingerprint, Zap, Shield, Cpu, Globe, Activity } from "lucide-react";
+import { Shield, Cpu, Globe, Activity } from "lucide-react";
 
 const SYSTEM_LORE = [
   {

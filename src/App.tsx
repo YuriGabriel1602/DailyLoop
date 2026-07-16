@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import NeuralHandshake from "./components/NeuralHandshake";
 import { Dashboard } from "./components/Dashboard"; // <-- AQUI É QUE ELE CHAMA O DASHBOARD!
