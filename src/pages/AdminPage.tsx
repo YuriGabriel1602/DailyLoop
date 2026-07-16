@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { RefreshCw, ShieldOff, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { PageHeader } from "@/components/PageHeader";
@@ -20,7 +19,6 @@ interface AdminUser {
 }
 
 export default function AdminPage() {
-  const navigate = useNavigate();
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [logs, setLogs] = useState<string[] | null>(null);
 
@@ -50,7 +48,7 @@ export default function AdminPage() {
 
   return (
     <div className="h-full w-full overflow-y-auto overflow-x-hidden pb-28">
-      <PageHeader title="Administração" onBack={() => navigate("/")} />
+      <PageHeader title="Administração" description="Usuários e logs do sistema." />
       <div className="mx-auto w-full max-w-5xl space-y-4 px-4 md:space-y-6 md:px-6">
         <Card>
           <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Usuários</CardTitle></CardHeader>

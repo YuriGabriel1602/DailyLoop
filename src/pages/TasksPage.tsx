@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bell, ClipboardList, Plus, Trash2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PageHeader } from "@/components/PageHeader";
 import { Card } from "@/components/ui/card";
@@ -24,7 +23,6 @@ const formatDueAt = (iso: string) =>
   new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 export default function TasksPage() {
-  const navigate = useNavigate();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDueAt, setNewTaskDueAt] = useState("");
@@ -60,7 +58,7 @@ export default function TasksPage() {
 
   return (
     <div className="flex h-full w-full flex-col overflow-y-auto overflow-x-hidden pb-28">
-      <PageHeader title="Tarefas" onBack={() => navigate("/")} />
+      <PageHeader title="Tarefas" description="O que precisa da sua atenção hoje." />
       <div className="mx-auto w-full max-w-2xl flex-1 space-y-6 px-4 md:px-6">
         <Card className="flex-row items-center gap-2 p-2">
           <Input

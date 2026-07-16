@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  Bot, CheckCircle2, Fingerprint, Globe, Home, LogOut, Loader2, Send, Settings, ShieldCheck, User, Wallet,
+  Bot, CheckCircle2, Globe, Home, LogOut, Loader2, Send, Settings, ShieldCheck, User, Wallet,
 } from "lucide-react";
 import { api, ApiError, registerUnauthorizedHandler } from "@/lib/api";
 import { useStore } from "@/store/useStore";
@@ -31,8 +31,8 @@ const PrometheusSheet = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
     if (!isOpen) return;
     api
       .get<ChatMessage[]>("/api/chat/history")
-      .then((history) => setChat(history.length ? history : [{ role: "assistant", content: "Núcleo Prometheus online." }]))
-      .catch(() => setChat([{ role: "assistant", content: "Núcleo Prometheus online." }]));
+      .then((history) => setChat(history.length ? history : [{ role: "assistant", content: "Prometheus online. Como posso ajudar?" }]))
+      .catch(() => setChat([{ role: "assistant", content: "Prometheus online. Como posso ajudar?" }]));
   }, [isOpen]);
 
   useEffect(() => {
@@ -49,8 +49,8 @@ const PrometheusSheet = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
       const data = await api.post<{ response: string }>("/api/chat", { message: userMsg });
       setChat((prev) => [...prev, { role: "assistant", content: data.response }]);
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Sinal perdido: backend offline.";
-      setChat((prev) => [...prev, { role: "assistant", content: `⚠️ ${message}` }]);
+      const message = err instanceof ApiError ? err.message : "Não consegui falar com o backend agora.";
+      setChat((prev) => [...prev, { role: "assistant", content: message }]);
     } finally {
       setLoading(false);
     }
@@ -74,7 +74,7 @@ const PrometheusSheet = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
                     msg.role === "assistant" ? "border-primary/20 bg-primary/10 text-primary" : "border-border bg-muted text-foreground"
                   )}
                 >
-                  {msg.role === "assistant" ? <Bot size={15} /> : <Fingerprint size={15} />}
+                  {msg.role === "assistant" ? <Bot size={15} /> : <User size={15} />}
                 </div>
                 <div
                   className={cn(
@@ -88,7 +88,7 @@ const PrometheusSheet = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
             ))}
             {loading && (
               <div className="ml-11 flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 size={12} className="animate-spin" /> Processando...
+                <Loader2 size={12} className="animate-spin" /> Pensando...
               </div>
             )}
             <div ref={endRef} />
@@ -121,13 +121,108 @@ const NAV_ITEMS = [
   { to: "/settings", icon: Settings, label: "Sistema" },
 ];
 
-const Dock = ({ onOpenPrometheus }: { onOpenPrometheus: () => void }) => {
+const UserMenu = ({ collapsed }: { collapsed?: boolean }) => {
+  const user = useStore((s) => s.user);
+  const logout = useStore((s) => s.logout);
+  const navigate = useNavigate();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className={cn(
+            "flex w-full items-center gap-2 rounded-lg border py-1.5 pr-2.5 pl-1.5 text-left text-sm transition-colors hover:bg-muted",
+            collapsed && "justify-center px-1.5"
+          )}
+        >
+          <Avatar className="size-6 shrink-0"><AvatarFallback className="text-[10px]">{user?.username?.charAt(0).toUpperCase()}</AvatarFallback></Avatar>
+          {!collapsed && <span className="min-w-0 flex-1 truncate">{user?.username}</span>}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" side="top">
+        <DropdownMenuLabel className="font-normal">
+          <p className="text-sm font-medium">{user?.username}</p>
+          <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => navigate("/settings")}>
+          <User size={14} /> Configurações
+        </DropdownMenuItem>
+        {user?.role === "admin" && (
+          <DropdownMenuItem onSelect={() => navigate("/admin")}>
+            <ShieldCheck size={14} /> Administração
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" onSelect={() => { logout(); navigate("/login", { replace: true }); }}>
+          <LogOut size={14} /> Sair
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
+
+const Sidebar = ({ onOpenPrometheus }: { onOpenPrometheus: () => void }) => {
   const isAdmin = useStore((s) => s.user?.role === "admin");
   const items = [...NAV_ITEMS, ...(isAdmin ? [{ to: "/admin", icon: ShieldCheck, label: "Admin" }] : [])];
 
   return (
-    <div className="fixed bottom-4 left-1/2 z-50 w-full -translate-x-1/2 px-4 sm:bottom-6 sm:w-auto sm:px-0">
-      <div className="flex items-center gap-1 overflow-x-auto rounded-2xl border bg-card/95 p-1.5 shadow-lg backdrop-blur-sm sm:rounded-full">
+    <aside className="hidden h-full w-60 shrink-0 flex-col border-r bg-card/30 md:flex">
+      <div className="p-5">
+        <Logo />
+      </div>
+
+      <nav className="flex-1 space-y-0.5 px-3">
+        {items.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={"end" in item ? item.end : undefined}
+            className={({ isActive }) =>
+              cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                isActive && "bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary"
+              )
+            }
+          >
+            <item.icon size={16} className="shrink-0" />
+            {item.label}
+          </NavLink>
+        ))}
+      </nav>
+
+      <div className="space-y-2 p-3">
+        <button
+          onClick={onOpenPrometheus}
+          className="flex w-full items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+        >
+          <Bot size={16} className="shrink-0" /> Prometheus
+        </button>
+        <UserMenu />
+      </div>
+    </aside>
+  );
+};
+
+const MobileTopBar = ({ onOpenPrometheus }: { onOpenPrometheus: () => void }) => (
+  <div className="flex shrink-0 items-center justify-between border-b bg-background/80 px-4 py-3 backdrop-blur-sm md:hidden">
+    <Logo />
+    <div className="flex items-center gap-1.5">
+      <Button variant="ghost" size="icon-sm" onClick={onOpenPrometheus} className="text-primary hover:bg-primary/10">
+        <Bot size={17} />
+      </Button>
+      <UserMenu collapsed />
+    </div>
+  </div>
+);
+
+const MobileDock = () => {
+  const isAdmin = useStore((s) => s.user?.role === "admin");
+  const items = [...NAV_ITEMS, ...(isAdmin ? [{ to: "/admin", icon: ShieldCheck, label: "Admin" }] : [])];
+
+  return (
+    <div className="fixed bottom-4 left-1/2 z-50 w-full -translate-x-1/2 px-4 md:hidden">
+      <div className="flex items-center gap-1 overflow-x-auto rounded-2xl border bg-card/95 p-1.5 shadow-lg backdrop-blur-sm">
         {items.map((item) => (
           <NavLink
             key={item.to}
@@ -136,7 +231,7 @@ const Dock = ({ onOpenPrometheus }: { onOpenPrometheus: () => void }) => {
             title={item.label}
             className={({ isActive }) =>
               cn(
-                "flex size-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                "flex size-10 shrink-0 flex-1 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
                 isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
               )
             }
@@ -144,54 +239,7 @@ const Dock = ({ onOpenPrometheus }: { onOpenPrometheus: () => void }) => {
             <item.icon size={18} />
           </NavLink>
         ))}
-        <div className="mx-1 h-6 w-px shrink-0 bg-border" />
-        <button
-          onClick={onOpenPrometheus}
-          title="Prometheus"
-          className="flex size-10 shrink-0 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/10"
-        >
-          <Bot size={18} />
-        </button>
       </div>
-    </div>
-  );
-};
-
-const TopBar = () => {
-  const user = useStore((s) => s.user);
-  const logout = useStore((s) => s.logout);
-  const navigate = useNavigate();
-
-  return (
-    <div className="flex shrink-0 items-center justify-between border-b bg-background/80 px-4 py-3 backdrop-blur-sm md:px-6">
-      <Logo />
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-2 rounded-full border py-1 pr-3 pl-1 text-sm transition-colors hover:bg-muted">
-            <Avatar className="size-6"><AvatarFallback className="text-[10px]">{user?.username?.charAt(0).toUpperCase()}</AvatarFallback></Avatar>
-            <span className="hidden max-w-[120px] truncate sm:inline">{user?.username}</span>
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel className="font-normal">
-            <p className="text-sm font-medium">{user?.username}</p>
-            <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => navigate("/settings")}>
-            <User size={14} /> Configurações
-          </DropdownMenuItem>
-          {user?.role === "admin" && (
-            <DropdownMenuItem onSelect={() => navigate("/admin")}>
-              <ShieldCheck size={14} /> Administração
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive" onSelect={() => { logout(); navigate("/login", { replace: true }); }}>
-            <LogOut size={14} /> Sair
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
     </div>
   );
 };
@@ -210,7 +258,7 @@ export const Layout = () => {
   }, [logout, navigate]);
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-x-hidden bg-background">
+    <div className="relative flex h-full w-full overflow-hidden bg-background">
       <div
         className="pointer-events-none fixed inset-0 z-0"
         style={{
@@ -218,8 +266,9 @@ export const Layout = () => {
             "radial-gradient(circle at 15% 0%, color-mix(in oklch, var(--primary) 8%, transparent), transparent 45%)",
         }}
       />
+      <Sidebar onOpenPrometheus={() => setPrometheusOpen(true)} />
       <div className="relative z-10 flex h-full flex-1 flex-col overflow-hidden">
-        <TopBar />
+        <MobileTopBar onOpenPrometheus={() => setPrometheusOpen(true)} />
         <div className="relative flex-1 overflow-hidden">
           <AnimatePresence mode="wait">
             <motion.div
@@ -235,7 +284,7 @@ export const Layout = () => {
           </AnimatePresence>
         </div>
       </div>
-      <Dock onOpenPrometheus={() => setPrometheusOpen(true)} />
+      <MobileDock />
       <PrometheusSheet isOpen={isPrometheusOpen} onClose={() => setPrometheusOpen(false)} />
     </div>
   );

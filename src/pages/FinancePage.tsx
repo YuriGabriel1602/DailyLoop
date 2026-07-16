@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { BarChart3, PieChart as PieIcon, Receipt, TrendingDown, TrendingUp, Upload, Wallet } from "lucide-react";
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -77,7 +76,6 @@ function ChartTooltip({ active, payload, label }: any) {
 }
 
 export default function FinancePage() {
-  const navigate = useNavigate();
   const [stats, setStats] = useState<Stats | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [description, setDescription] = useState("");
@@ -142,7 +140,7 @@ export default function FinancePage() {
 
   return (
     <div className="h-full w-full overflow-y-auto overflow-x-hidden pb-28">
-      <PageHeader title="Centro Financeiro" onBack={() => navigate("/")} />
+      <PageHeader title="Finanças" description="Saldo, categorias e orçamentos em um só lugar." />
       <div className="mx-auto w-full max-w-5xl space-y-4 px-4 md:space-y-6 md:px-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 md:gap-6">
           <Card className="sm:col-span-1">

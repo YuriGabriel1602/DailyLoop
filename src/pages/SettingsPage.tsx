@@ -107,7 +107,7 @@ export default function SettingsPage() {
 
   return (
     <div className="h-full w-full overflow-y-auto overflow-x-hidden pb-28">
-      <PageHeader title="Configurações" onBack={() => navigate("/")} />
+      <PageHeader title="Configurações" description="Conta, notificações e preferências." />
       <div className="mx-auto w-full max-w-2xl space-y-4 px-4 md:space-y-6 md:px-6">
         <Card>
           <CardContent className="flex items-center gap-3 pt-1">
