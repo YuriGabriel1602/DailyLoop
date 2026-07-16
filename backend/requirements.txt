@@ -7,7 +7,7 @@ python-multipart
 bcrypt==3.2.0
 
 # IA (chat Prometheus)
-google-generativeai
+google-genai
 
 # Financeiro (categorização + import de extrato OFX)
 scikit-learn

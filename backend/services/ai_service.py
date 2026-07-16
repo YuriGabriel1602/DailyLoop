@@ -2,7 +2,8 @@ import logging
 from datetime import datetime
 from decimal import Decimal
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from sqlmodel import Session, select
 
 from config import settings
@@ -10,8 +11,7 @@ from database import Budget, Message, Task, Transaction, User
 
 logger = logging.getLogger(__name__)
 
-if settings.gemini_api_key:
-    genai.configure(api_key=settings.gemini_api_key)
+_client = genai.Client(api_key=settings.gemini_api_key) if settings.gemini_api_key else None
 
 SYSTEM_PROMPT = """
 Você é o Prometheus, o assistente pessoal do DailyLoop.
@@ -28,7 +28,7 @@ genérico. Use Markdown (negrito, listas) quando ajudar a clareza, sem exagerar.
 HISTORY_LIMIT = 20
 
 
-def _load_history(session: Session, user: User) -> list[dict]:
+def _load_history(session: Session, user: User) -> list[types.Content]:
     messages = session.exec(
         select(Message)
         .where(Message.owner_id == user.id)
@@ -36,7 +36,10 @@ def _load_history(session: Session, user: User) -> list[dict]:
         .limit(HISTORY_LIMIT)
     ).all()
     messages.reverse()
-    return [{"role": "model" if m.role == "assistant" else "user", "parts": [m.content]} for m in messages]
+    return [
+        types.Content(role="model" if m.role == "assistant" else "user", parts=[types.Part(text=m.content)])
+        for m in messages
+    ]
 
 
 def _make_tools(session: Session, user: User):
@@ -122,16 +125,18 @@ def _make_tools(session: Session, user: User):
 def ask_prometheus(session: Session, user: User, prompt: str) -> str:
     """Interface principal de comunicação com a IA — reinjeta o histórico recente da
     conversa e dá ao modelo ferramentas de leitura/ação sobre tarefas e finanças reais."""
-    if not settings.gemini_api_key:
+    if not _client:
         return "Erro: Chave API ausente no servidor backend."
 
     try:
-        model = genai.GenerativeModel(
-            "gemini-2.5-flash",
-            system_instruction=SYSTEM_PROMPT,
-            tools=_make_tools(session, user),
+        chat = _client.chats.create(
+            model="gemini-flash-latest",
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_PROMPT,
+                tools=_make_tools(session, user),
+            ),
+            history=_load_history(session, user),
         )
-        chat = model.start_chat(history=_load_history(session, user), enable_automatic_function_calling=True)
         response = chat.send_message(prompt)
         return response.text.strip()
     except Exception:
