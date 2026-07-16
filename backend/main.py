@@ -1,4 +1,5 @@
 import logging
+import logging.handlers
 import sys
 from pathlib import Path
 
@@ -12,9 +13,33 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from database import create_db_and_tables
-from routers import chat, finance, meta, notes, tasks
+from routers import admin, auth, chat, finance, meta, notes, tasks
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+def _configure_logging():
+    root_logger = logging.getLogger()
+    if root_logger.handlers:
+        # Evita registrar os handlers 2x: `python main.py` importa este módulo como
+        # __main__ e o uvicorn.run("main:app", ...) reimporta como "main" no mesmo processo.
+        return
+
+    settings.log_dir.mkdir(parents=True, exist_ok=True)
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+    file_handler = logging.handlers.RotatingFileHandler(
+        settings.log_file, maxBytes=1_000_000, backupCount=3, encoding="utf-8"
+    )
+    file_handler.setFormatter(formatter)
+
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+
+    root_logger.setLevel(logging.INFO)
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(console_handler)
+
+
+_configure_logging()
 
 app = FastAPI(title="DailyLoop OS Core v3.0")
 
@@ -27,6 +52,8 @@ app.add_middleware(
 )
 
 app.include_router(meta.router)
+app.include_router(auth.router)
+app.include_router(admin.router)
 app.include_router(notes.router)
 app.include_router(chat.router)
 app.include_router(tasks.router)

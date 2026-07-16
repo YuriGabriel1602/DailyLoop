@@ -11,7 +11,8 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from database import Budget, Transaction, get_session
+from database import Budget, Transaction, User, get_session
+from services.auth_service import get_current_user
 from services.finance_categorizer import categorize_transactions, predict_category
 
 logger = logging.getLogger(__name__)
@@ -31,13 +32,23 @@ class TransactionCreate(BaseModel):
 
 
 @router.get("/transactions")
-def list_transactions(session: Session = Depends(get_session)):
-    statement = select(Transaction).order_by(Transaction.date.desc())
+def list_transactions(
+    current_user: User = Depends(get_current_user), session: Session = Depends(get_session)
+):
+    statement = (
+        select(Transaction)
+        .where(Transaction.owner_id == current_user.id)
+        .order_by(Transaction.date.desc())
+    )
     return session.exec(statement).all()
 
 
 @router.post("/transactions")
-def create_transaction(payload: TransactionCreate, session: Session = Depends(get_session)):
+def create_transaction(
+    payload: TransactionCreate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
     if payload.category:
         category = payload.category
     elif payload.type == "income":
@@ -50,6 +61,7 @@ def create_transaction(payload: TransactionCreate, session: Session = Depends(ge
         type=payload.type,
         category=category,
         date=payload.date or date_type.today(),
+        owner_id=current_user.id,
     )
     session.add(db_txn)
     session.commit()
@@ -58,9 +70,13 @@ def create_transaction(payload: TransactionCreate, session: Session = Depends(ge
 
 
 @router.delete("/transactions/{transaction_id}")
-def delete_transaction(transaction_id: int, session: Session = Depends(get_session)):
+def delete_transaction(
+    transaction_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
     db_txn = session.get(Transaction, transaction_id)
-    if not db_txn:
+    if not db_txn or db_txn.owner_id != current_user.id:
         raise HTTPException(status_code=404, detail="Transação não encontrada")
     session.delete(db_txn)
     session.commit()
@@ -182,7 +198,9 @@ def _parse_ofx(content: bytes) -> list[dict]:
 
 @router.post("/import")
 async def import_statement(
-    file: UploadFile = File(...), session: Session = Depends(get_session)
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
 ):
     filename = (file.filename or "").lower()
     content = await file.read()
@@ -210,6 +228,7 @@ async def import_statement(
     for row, category in zip(rows, categories):
         existing = session.exec(
             select(Transaction).where(
+                Transaction.owner_id == current_user.id,
                 Transaction.date == row["date"],
                 Transaction.amount == row["amount"],
                 Transaction.description == row["description"],
@@ -225,6 +244,7 @@ async def import_statement(
                 type=row["type"],
                 category=category,
                 date=row["date"],
+                owner_id=current_user.id,
             )
         )
         imported += 1
@@ -241,20 +261,32 @@ class BudgetUpsert(BaseModel):
 
 
 @router.get("/budgets")
-def list_budgets(session: Session = Depends(get_session)):
-    return session.exec(select(Budget)).all()
+def list_budgets(
+    current_user: User = Depends(get_current_user), session: Session = Depends(get_session)
+):
+    return session.exec(select(Budget).where(Budget.owner_id == current_user.id)).all()
 
 
 @router.put("/budgets")
-def upsert_budget(payload: BudgetUpsert, session: Session = Depends(get_session)):
+def upsert_budget(
+    payload: BudgetUpsert,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
     existing = session.exec(
-        select(Budget).where(Budget.category == payload.category)
+        select(Budget).where(
+            Budget.owner_id == current_user.id, Budget.category == payload.category
+        )
     ).first()
     if existing:
         existing.monthly_limit = payload.monthly_limit
         session.add(existing)
     else:
-        existing = Budget(category=payload.category, monthly_limit=payload.monthly_limit)
+        existing = Budget(
+            category=payload.category,
+            monthly_limit=payload.monthly_limit,
+            owner_id=current_user.id,
+        )
         session.add(existing)
     session.commit()
     session.refresh(existing)
@@ -262,9 +294,13 @@ def upsert_budget(payload: BudgetUpsert, session: Session = Depends(get_session)
 
 
 @router.delete("/budgets/{budget_id}")
-def delete_budget(budget_id: int, session: Session = Depends(get_session)):
+def delete_budget(
+    budget_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
     db_budget = session.get(Budget, budget_id)
-    if not db_budget:
+    if not db_budget or db_budget.owner_id != current_user.id:
         raise HTTPException(status_code=404, detail="Orçamento não encontrado")
     session.delete(db_budget)
     session.commit()
@@ -275,9 +311,13 @@ def delete_budget(budget_id: int, session: Session = Depends(get_session)):
 # Estatísticas
 # ==============================================================================
 @router.get("/stats")
-def get_stats(session: Session = Depends(get_session)):
-    transactions = session.exec(select(Transaction)).all()
-    budgets = session.exec(select(Budget)).all()
+def get_stats(
+    current_user: User = Depends(get_current_user), session: Session = Depends(get_session)
+):
+    transactions = session.exec(
+        select(Transaction).where(Transaction.owner_id == current_user.id)
+    ).all()
+    budgets = session.exec(select(Budget).where(Budget.owner_id == current_user.id)).all()
 
     today = date_type.today()
     current_month_key = (today.year, today.month)
