@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -14,7 +15,7 @@ from services.auth_service import (
     hash_password,
     verify_password,
 )
-from services.email_service import send_password_reset_email
+from services.notification_service import notify
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,8 @@ def _user_public(user: User) -> dict:
         "email": user.email,
         "role": user.role,
         "is_active": user.is_active,
+        "phone_number": user.phone_number,
+        "whatsapp_opted_in": user.whatsapp_opted_in,
     }
 
 
@@ -107,6 +110,32 @@ def me(current_user: User = Depends(get_current_user)):
     return _user_public(current_user)
 
 
+class ProfileUpdate(BaseModel):
+    phone_number: Optional[str] = None
+    whatsapp_opted_in: Optional[bool] = None
+
+
+@router.patch("/me")
+def update_me(
+    payload: ProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    if payload.phone_number is not None:
+        phone = payload.phone_number.strip()
+        if phone and not phone.startswith("+"):
+            raise HTTPException(status_code=400, detail="Telefone deve estar no formato E.164 (ex: +5511999999999)")
+        current_user.phone_number = phone or None
+    if payload.whatsapp_opted_in is not None:
+        if payload.whatsapp_opted_in and not current_user.phone_number:
+            raise HTTPException(status_code=400, detail="Cadastre um telefone antes de ativar o WhatsApp")
+        current_user.whatsapp_opted_in = payload.whatsapp_opted_in
+    session.add(current_user)
+    session.commit()
+    session.refresh(current_user)
+    return _user_public(current_user)
+
+
 @router.post("/forgot-password")
 def forgot_password(payload: ForgotPasswordRequest, session: Session = Depends(get_session)):
     user = session.exec(select(User).where(User.email == payload.email)).first()
@@ -122,10 +151,21 @@ def forgot_password(payload: ForgotPasswordRequest, session: Session = Depends(g
         )
         session.commit()
         reset_link = f"{settings.frontend_url}/reset-password/{token_value}"
-        sent = send_password_reset_email(user.email, reset_link)
-        if not sent:
-            # SMTP não configurado (modo dev): loga o link pra não travar o teste do fluxo.
-            logger.info("Link de redefinição (SMTP não configurado): %s", reset_link)
+        result = notify(
+            session,
+            user,
+            "password_reset",
+            email_subject="Redefinição de senha — DailyLoop",
+            email_body=(
+                "Você solicitou a redefinição da sua senha no DailyLoop.\n\n"
+                f"Clique no link abaixo (válido por tempo limitado):\n{reset_link}\n\n"
+                "Se você não pediu isso, pode ignorar este email."
+            ),
+            whatsapp_params=[user.username, token_value],
+        )
+        if not result["email_sent"] and not result["whatsapp_sent"]:
+            # Nenhum canal configurado/habilitado (modo dev): loga o link pra não travar o teste.
+            logger.info("Link de redefinição (nenhum canal configurado): %s", reset_link)
 
     # Resposta genérica sempre igual, exista ou não o email — evita confirmar quais
     # emails estão cadastrados.

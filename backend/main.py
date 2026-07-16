@@ -13,7 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from database import create_db_and_tables
-from routers import admin, auth, chat, finance, meta, notes, tasks
+from routers import admin, auth, chat, finance, meta, notes, notifications, tasks
+from services.scheduler_service import start_scheduler
 
 
 def _configure_logging():
@@ -58,11 +59,13 @@ app.include_router(notes.router)
 app.include_router(chat.router)
 app.include_router(tasks.router)
 app.include_router(finance.router)
+app.include_router(notifications.router)
 
 
 @app.on_event("startup")
 def on_startup():
     create_db_and_tables()
+    start_scheduler()
     logging.getLogger(__name__).info("DailyLoop Backend: Sistemas Online.")
 
 

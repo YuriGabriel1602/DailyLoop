@@ -13,5 +13,9 @@ google-generativeai
 scikit-learn
 ofxparse
 
+# Notificações (WhatsApp Business Cloud API) + agendamento
+httpx
+apscheduler
+
 # Config
 python-dotenv

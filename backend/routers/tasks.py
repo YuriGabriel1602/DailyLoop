@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,12 +14,14 @@ router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 class TaskCreate(BaseModel):
     title: str
     category: str = "Geral"
+    due_at: Optional[datetime] = None
 
 
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
     category: Optional[str] = None
     completed: Optional[bool] = None
+    due_at: Optional[datetime] = None
 
 
 def _get_owned_task(task_id: int, current_user: User, session: Session) -> Task:
@@ -44,7 +47,7 @@ def create_task(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    db_task = Task(title=task.title, category=task.category, owner_id=current_user.id)
+    db_task = Task(title=task.title, category=task.category, due_at=task.due_at, owner_id=current_user.id)
     session.add(db_task)
     session.commit()
     session.refresh(db_task)

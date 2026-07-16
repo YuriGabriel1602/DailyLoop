@@ -7,12 +7,15 @@ export interface AuthUser {
   email: string;
   role: 'user' | 'admin';
   is_active: boolean;
+  phone_number: string | null;
+  whatsapp_opted_in: boolean;
 }
 
 interface DailyLoopState {
   user: AuthUser | null;
   token: string | null;
   setAuth: (user: AuthUser, token: string) => void;
+  updateUser: (patch: Partial<AuthUser>) => void;
   logout: () => void;
 }
 
@@ -22,6 +25,7 @@ export const useStore = create<DailyLoopState>()(
       user: null,
       token: null,
       setAuth: (user, token) => set({ user, token }),
+      updateUser: (patch) => set((s) => (s.user ? { user: { ...s.user, ...patch } } : {})),
       logout: () => set({ user: null, token: null }),
     }),
     { name: 'dailyloop-auth', storage: createJSONStorage(() => localStorage) }

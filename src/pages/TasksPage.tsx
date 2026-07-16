@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ClipboardList, Plus, Trash2 } from "lucide-react";
+import { Bell, ClipboardList, Plus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PageHeader } from "@/components/PageHeader";
@@ -17,12 +17,17 @@ interface Task {
   category: string;
   completed: boolean;
   created_at: string;
+  due_at: string | null;
 }
+
+const formatDueAt = (iso: string) =>
+  new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 export default function TasksPage() {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskDueAt, setNewTaskDueAt] = useState("");
   const [loading, setLoading] = useState(true);
 
   const loadTasks = () => {
@@ -33,9 +38,14 @@ export default function TasksPage() {
 
   const addTask = async () => {
     if (!newTaskTitle.trim()) return;
-    const created = await api.post<Task>("/api/tasks", { title: newTaskTitle, category: "Geral" });
+    const created = await api.post<Task>("/api/tasks", {
+      title: newTaskTitle,
+      category: "Geral",
+      due_at: newTaskDueAt ? new Date(newTaskDueAt).toISOString() : null,
+    });
     setTasks((prev) => [created, ...prev]);
     setNewTaskTitle("");
+    setNewTaskDueAt("");
   };
 
   const toggleTask = async (task: Task) => {
@@ -59,6 +69,13 @@ export default function TasksPage() {
             onKeyDown={(e) => e.key === "Enter" && addTask()}
             placeholder="O que precisa ser feito?"
             className="border-none shadow-none focus-visible:ring-0"
+          />
+          <Input
+            type="datetime-local"
+            value={newTaskDueAt}
+            onChange={(e) => setNewTaskDueAt(e.target.value)}
+            title="Prazo (opcional) — habilita o lembrete"
+            className="w-auto shrink-0 border-none text-xs text-muted-foreground shadow-none focus-visible:ring-0"
           />
           <Button size="icon" onClick={addTask} className="shrink-0">
             <Plus size={16} />
@@ -99,7 +116,14 @@ export default function TasksPage() {
                       </button>
                       <div className="min-w-0">
                         <p className={cn("truncate text-sm font-medium", task.completed && "line-through")}>{task.title}</p>
-                        <Badge variant="outline" className="mt-0.5">{task.category}</Badge>
+                        <div className="mt-0.5 flex items-center gap-2">
+                          <Badge variant="outline">{task.category}</Badge>
+                          {task.due_at && (
+                            <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                              <Bell size={10} /> {formatDueAt(task.due_at)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <Button variant="ghost" size="icon-sm" onClick={() => deleteTask(task.id)} className="shrink-0 text-muted-foreground hover:text-destructive">

@@ -8,7 +8,7 @@ from sqlmodel import Session, select
 from config import settings
 from database import PasswordResetToken, User, get_session
 from services.auth_service import generate_reset_token, require_admin
-from services.email_service import send_password_reset_email
+from services.notification_service import notify
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
@@ -78,8 +78,18 @@ def admin_reset_password(user_id: int, session: Session = Depends(get_session)):
     )
     session.commit()
     reset_link = f"{settings.frontend_url}/reset-password/{token_value}"
-    sent = send_password_reset_email(user.email, reset_link)
-    return {"message": "Link de redefinição gerado.", "email_sent": sent}
+    result = notify(
+        session,
+        user,
+        "password_reset",
+        email_subject="Redefinição de senha — DailyLoop",
+        email_body=(
+            "Um administrador solicitou a redefinição da sua senha no DailyLoop.\n\n"
+            f"Clique no link abaixo (válido por tempo limitado):\n{reset_link}"
+        ),
+        whatsapp_params=[user.username, token_value],
+    )
+    return {"message": "Link de redefinição gerado.", **result}
 
 
 @router.get("/logs")

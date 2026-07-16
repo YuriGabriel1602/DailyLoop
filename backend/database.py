@@ -19,6 +19,8 @@ class User(SQLModel, table=True):
     role: str = "user"  # user, admin
     is_active: bool = True
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    phone_number: Optional[str] = None  # E.164, ex: +5511999999999
+    whatsapp_opted_in: bool = False
 
 
 class PasswordResetToken(SQLModel, table=True):
@@ -37,6 +39,18 @@ class Task(SQLModel, table=True):
     category: str = "Geral"
     completed: bool = False
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    due_at: Optional[datetime] = None
+    reminded_at: Optional[datetime] = None
+
+
+class NotificationPreference(SQLModel, table=True):
+    __table_args__ = (UniqueConstraint("owner_id", "category", name="uq_notifpref_owner_category"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    owner_id: int = Field(foreign_key="user.id")
+    category: str  # password_reset, task_reminder, daily_briefing, budget_alert
+    email_enabled: bool = True
+    whatsapp_enabled: bool = False
 
 
 class Budget(SQLModel, table=True):

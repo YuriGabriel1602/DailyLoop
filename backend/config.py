@@ -40,5 +40,33 @@ class Settings:
     # URL do frontend, usada para montar o link de redefinição de senha
     frontend_url: str = os.getenv("FRONTEND_URL", "http://127.0.0.1:1420")
 
+    # WhatsApp Business Cloud API (Meta)
+    whatsapp_access_token: str = os.getenv("WHATSAPP_ACCESS_TOKEN", "")
+    whatsapp_phone_number_id: str = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
+    whatsapp_business_account_id: str = os.getenv("WHATSAPP_BUSINESS_ACCOUNT_ID", "")
+    whatsapp_api_version: str = os.getenv("WHATSAPP_API_VERSION", "v20.0")
+
+    # Nomes dos templates aprovados no Meta Business Manager — atualize aqui
+    # quando o nome definitivo aprovado divergir do rascunho.
+    whatsapp_template_password_reset: str = os.getenv(
+        "WHATSAPP_TEMPLATE_PASSWORD_RESET", "password_reset_link"
+    )
+    whatsapp_template_task_reminder: str = os.getenv(
+        "WHATSAPP_TEMPLATE_TASK_REMINDER", "task_reminder"
+    )
+    whatsapp_template_daily_briefing: str = os.getenv(
+        "WHATSAPP_TEMPLATE_DAILY_BRIEFING", "daily_briefing"
+    )
+    whatsapp_template_budget_alert: str = os.getenv(
+        "WHATSAPP_TEMPLATE_BUDGET_ALERT", "budget_alert"
+    )
+    whatsapp_template_language: str = os.getenv("WHATSAPP_TEMPLATE_LANGUAGE", "pt_BR")
+
+    # Agendamento (horário do servidor) do briefing diário e intervalo de
+    # checagem de lembretes de tarefa.
+    daily_briefing_hour: int = int(os.getenv("DAILY_BRIEFING_HOUR", "7"))
+    task_reminder_check_minutes: int = int(os.getenv("TASK_REMINDER_CHECK_MINUTES", "15"))
+    task_reminder_window_minutes: int = int(os.getenv("TASK_REMINDER_WINDOW_MINUTES", "60"))
+
 
 settings = Settings()

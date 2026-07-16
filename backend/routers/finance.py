@@ -14,10 +14,54 @@ from sqlmodel import Session, select
 from database import Budget, Transaction, User, get_session
 from services.auth_service import get_current_user
 from services.finance_categorizer import categorize_transactions, predict_category
+from services.notification_service import notify
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/finance", tags=["finance"])
+
+
+def _check_budget_alert(session: Session, user: User, category: str, txn_date: date_type, new_amount: Decimal):
+    """Dispara alerta de orçamento quando esta transação faz a categoria
+    cruzar de "dentro do limite" pra "estourado" no mês corrente."""
+    budget = session.exec(
+        select(Budget).where(Budget.owner_id == user.id, Budget.category == category)
+    ).first()
+    if not budget or txn_date.year != date_type.today().year or txn_date.month != date_type.today().month:
+        return
+
+    month_transactions = session.exec(
+        select(Transaction).where(
+            Transaction.owner_id == user.id,
+            Transaction.category == category,
+            Transaction.type == "expense",
+        )
+    ).all()
+    spent_total = sum(
+        (t.amount for t in month_transactions if t.date.month == txn_date.month and t.date.year == txn_date.year),
+        Decimal("0"),
+    )
+    spent_before = spent_total - new_amount
+
+    if spent_before < budget.monthly_limit <= spent_total:
+        percent = float(spent_total / budget.monthly_limit * 100) if budget.monthly_limit else 0.0
+        notify(
+            session,
+            user,
+            "budget_alert",
+            email_subject=f"Orçamento de {category} estourou — DailyLoop",
+            email_body=(
+                f"Você já gastou R$ {spent_total:.2f} de R$ {budget.monthly_limit:.2f} "
+                f"no orçamento de \"{category}\" este mês ({percent:.0f}%)."
+            ),
+            whatsapp_params=[
+                user.username,
+                f"{percent:.0f}",
+                category,
+                f"{spent_total:.2f}",
+                f"{budget.monthly_limit:.2f}",
+            ],
+        )
 
 
 # ==============================================================================
@@ -74,6 +118,8 @@ def create_transaction(
     session.add(db_txn)
     session.commit()
     session.refresh(db_txn)
+    if db_txn.type == "expense":
+        _check_budget_alert(session, current_user, db_txn.category, db_txn.date, db_txn.amount)
     return db_txn
 
 
@@ -233,6 +279,8 @@ async def import_statement(
 
     imported = 0
     skipped = 0
+    new_amount_by_category: dict[str, Decimal] = {}
+    today = date_type.today()
     for row, category in zip(rows, categories):
         existing = session.exec(
             select(Transaction).where(
@@ -256,7 +304,13 @@ async def import_statement(
             )
         )
         imported += 1
+        if row["type"] == "expense" and row["date"].year == today.year and row["date"].month == today.month:
+            new_amount_by_category[category] = new_amount_by_category.get(category, Decimal("0")) + row["amount"]
     session.commit()
+
+    for category, total_new_amount in new_amount_by_category.items():
+        _check_budget_alert(session, current_user, category, today, total_new_amount)
+
     return {"imported": imported, "skipped_duplicates": skipped}
 
 
