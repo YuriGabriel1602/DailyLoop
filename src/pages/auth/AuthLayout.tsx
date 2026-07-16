@@ -55,7 +55,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
           </div>
 
           <h1 className="max-w-sm text-[28px] leading-[1.15] font-extrabold tracking-tight">
-            Dispare menos perguntas ao dia. <span className="text-primary">Deixe o Prometheus organizar.</span>
+            Menos abas abertas de manhã. <span className="text-primary">Prometheus já organizou o seu dia.</span>
           </h1>
         </motion.div>
 
