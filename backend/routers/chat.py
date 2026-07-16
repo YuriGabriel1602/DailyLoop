@@ -19,8 +19,10 @@ def chat(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
+    # Carrega o histórico (mensagens já persistidas) antes de gravar a mensagem atual,
+    # senão o autoflush do SQLAlchemy a incluiria duas vezes no contexto do modelo.
+    response = ask_prometheus(session, current_user, request.message)
     session.add(Message(role="user", content=request.message, owner_id=current_user.id))
-    response = ask_prometheus(request.message)
     session.add(Message(role="assistant", content=response, owner_id=current_user.id))
     session.commit()
     return {"response": response}
