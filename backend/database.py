@@ -216,6 +216,30 @@ class ActivityLog(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class HivePost(SQLModel, table=True):
+    """Único lugar do sistema em que conteúdo cruza usuários — tudo o mais é isolado
+    por owner_id. `content` já vem pronto (em português) de quem posta; conquistas
+    (kind="achievement") nunca são geradas automaticamente, só quando o próprio usuário
+    confirma o compartilhamento a partir de um marco real (streak de Ritual, meta 100%)."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    owner_id: int = Field(foreign_key="user.id", index=True)
+    content: str
+    kind: str = "post"  # "post" | "achievement"
+    source_type: Optional[str] = None  # "ritual_streak" | "goal_complete"
+    likes_count: int = 0
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class HiveLike(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    post_id: int = Field(foreign_key="hivepost.id", index=True)
+    owner_id: int = Field(foreign_key="user.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint("post_id", "owner_id", name="uq_hive_like_post_owner"),)
+
+
 # --- CONFIGURAÇÃO DO MOTOR ---
 
 connect_args = (

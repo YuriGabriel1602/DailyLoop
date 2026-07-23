@@ -61,6 +61,7 @@ def update_goal(
     session: Session = Depends(get_session),
 ):
     goal = _get_owned(goal_id, current_user, session)
+    old_percent = goal.progress_percent
     patch_data = payload.model_dump(exclude_unset=True)
     if "progress_percent" in patch_data:
         patch_data["progress_percent"] = max(0, min(100, patch_data["progress_percent"]))
@@ -74,7 +75,8 @@ def update_goal(
             session, current_user.id, "pessoal", "goal.progress_updated",
             f"Meta '{goal.title}' foi pra {goal.progress_percent}%",
         )
-    return goal
+    achievement_hit = "progress_percent" in patch_data and goal.progress_percent == 100 and old_percent != 100
+    return {**goal.model_dump(), "achievement_hit": achievement_hit}
 
 
 @router.delete("/{goal_id}")

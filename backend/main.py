@@ -25,6 +25,7 @@ from routers import (
     gmail,
     goals,
     google_auth,
+    hive,
     inbox,
     insights,
     integrations,
@@ -96,6 +97,7 @@ app.include_router(rituals.router)
 app.include_router(goals.router)
 app.include_router(logs.router)
 app.include_router(google_auth.router)
+app.include_router(hive.router)
 app.include_router(calendar.router)
 app.include_router(gmail.router)
 app.include_router(fit.router)

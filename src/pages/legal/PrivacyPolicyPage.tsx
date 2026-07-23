@@ -35,6 +35,7 @@ export default function PrivacyPolicyPage() {
           <li><strong>Integrações conectadas:</strong> tokens de acesso — armazenados de forma criptografada — de Meta (WhatsApp, Instagram, Facebook), Google (Calendar, Gmail, Fit), GitHub, OpenAI e Anthropic, conforme você conectar cada uma nas telas de Integrações.</li>
           <li><strong>Google, quando conectado:</strong> eventos do Calendar, metadados/conteúdo de emails recentes (Gmail) e resumo diário de atividade física (Fit), usados apenas para exibição na Agenda.</li>
           <li><strong>Conversas com o Prometheus (IA):</strong> as mensagens trocadas com o assistente em cada lado, incluindo o histórico recente usado como contexto — mantidas separadas por ambiente.</li>
+          <li><strong>The Hive:</strong> posts de texto que você publica e conquistas que você escolhe compartilhar (streak de Ritual, meta 100% na Bússola) — seu nome de usuário aparece junto.</li>
           <li><strong>Dados técnicos:</strong> registros de acesso e logs do servidor, para segurança e diagnóstico.</li>
         </ul>
         <p>
@@ -42,6 +43,14 @@ export default function PrivacyPolicyPage() {
           Diário podem conter relatos pessoais sensíveis por natureza do próprio conteúdo que você escolhe
           escrever — tratamos esse conteúdo com o mesmo nível de proteção dos demais dados, sem análise
           além da reflexão gerada pela IA a seu pedido.
+        </p>
+        <p>
+          <strong>The Hive é a única área do DailyLoop em que o conteúdo que você publica fica visível a
+          outros usuários da plataforma</strong> — todo o resto do sistema (tarefas, finanças, diário, CRM,
+          conversas) é isolado por conta. Conquistas nunca são publicadas automaticamente: cada
+          compartilhamento exige sua confirmação explícita no momento em que o marco é atingido. Evite
+          incluir informações sensíveis no conteúdo dos posts, já que eles são públicos para quem usa o
+          DailyLoop.
         </p>
       </LegalSection>
 

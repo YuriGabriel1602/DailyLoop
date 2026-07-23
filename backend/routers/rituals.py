@@ -12,6 +12,10 @@ from services.auth_service import get_current_user
 
 router = APIRouter(prefix="/api/rituals", tags=["rituals"])
 
+# Marcos de streak que valem um convite pra compartilhar no Hive — nunca automático,
+# só quando o usuário aceita o toast que o frontend mostra ao ver `milestone_hit`.
+MILESTONES = {7, 14, 30, 60, 100, 180, 365}
+
 
 class RitualCreate(BaseModel):
     name: str
@@ -83,6 +87,8 @@ def log_steps(
     session: Session = Depends(get_session),
 ):
     ritual = _get_owned(ritual_id, current_user, session)
+    old_streak = _compute_streak(session, ritual.id)
+
     log_date = payload.date or date.today()
     log = session.exec(
         select(RitualLog).where(RitualLog.ritual_id == ritual.id, RitualLog.date == log_date)
@@ -94,7 +100,11 @@ def log_steps(
     session.commit()
     if payload.completed_steps:
         activity_log_service.log(session, current_user.id, "pessoal", "ritual.logged", f"Ritual '{ritual.name}' marcado")
-    return _public(ritual, session)
+
+    result = _public(ritual, session)
+    new_streak = result["streak"]
+    result["milestone_hit"] = new_streak if new_streak in MILESTONES and new_streak != old_streak else None
+    return result
 
 
 @router.delete("/{ritual_id}")
