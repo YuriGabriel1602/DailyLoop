@@ -1,0 +1,10 @@
+{
+  "projectId": "e46734a6-5721-426b-9614-540a30132996",
+  "shape": "package",
+  "pkg": "system",
+  "globalName": "DailyLoopUI",
+  "srcDir": "src/components/ui",
+  "entry": "./dist/index.es.js",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": ".design-sync/tailwind-build/tailwind.css"
+}
