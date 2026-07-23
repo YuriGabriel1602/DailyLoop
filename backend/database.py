@@ -130,6 +130,30 @@ class IntegrationCredential(SQLModel, table=True):
     status: str = "disconnected"  # disconnected, connected
     ai_default_mode: str = "24_7"  # 24_7, off
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    # Config extra por provedor de IA (channel="openai"/"anthropic"/"gemini") — os demais
+    # canais (whatsapp/instagram/facebook) simplesmente nunca preenchem esses campos.
+    custom_context: Optional[str] = None  # instrução extra só pra esse provedor
+    monthly_token_limit: Optional[int] = None
+    tokens_used_this_month: int = 0
+    usage_reset_month: Optional[str] = None  # "2026-07" — zera o contador ao virar o mês
+
+
+class BusinessAISettings(SQLModel, table=True):
+    """Uma linha por usuário (criada sob demanda) — regras operacionais do atendimento
+    automático do Inbox: horário, mensagem fora do expediente, filtro de grupos e watchdog."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    owner_id: int = Field(foreign_key="user.id", unique=True)
+    hours_mode: str = "24_7"  # "24_7" | "custom"
+    hours_start: str = "09:00"
+    hours_end: str = "18:00"
+    hours_days: str = '["mon","tue","wed","thu","fri","sat","sun"]'  # JSON
+    out_of_hours_message: str = (
+        "Olá {{cliente}}, no momento estamos fora do horário de atendimento. Já te respondemos assim que possível!"
+    )
+    ignore_whatsapp_groups: bool = True
+    watchdog_enabled: bool = True
+    watchdog_inactivity_minutes: int = 30
 
 
 class Conversation(SQLModel, table=True):
@@ -259,6 +283,10 @@ def _run_lightweight_migrations():
         ("user", "ai_provider_personal", "ALTER TABLE user ADD COLUMN ai_provider_personal VARCHAR DEFAULT 'gemini'"),
         ("user", "ai_provider_business", "ALTER TABLE user ADD COLUMN ai_provider_business VARCHAR DEFAULT 'gemini'"),
         ("message", "realm", "ALTER TABLE message ADD COLUMN realm VARCHAR DEFAULT 'pessoal'"),
+        ("integrationcredential", "custom_context", "ALTER TABLE integrationcredential ADD COLUMN custom_context VARCHAR"),
+        ("integrationcredential", "monthly_token_limit", "ALTER TABLE integrationcredential ADD COLUMN monthly_token_limit INTEGER"),
+        ("integrationcredential", "tokens_used_this_month", "ALTER TABLE integrationcredential ADD COLUMN tokens_used_this_month INTEGER DEFAULT 0"),
+        ("integrationcredential", "usage_reset_month", "ALTER TABLE integrationcredential ADD COLUMN usage_reset_month VARCHAR"),
     ]
     with engine.connect() as conn:
         for table_name, column_name, ddl in migrations:

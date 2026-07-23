@@ -28,6 +28,11 @@ class AiModeUpdate(BaseModel):
     ai_default_mode: str  # 24_7, off
 
 
+class AiConfigUpdate(BaseModel):
+    custom_context: Optional[str] = None
+    monthly_token_limit: Optional[int] = None
+
+
 def _public(cred: IntegrationCredential) -> dict:
     return {
         "id": cred.id,
@@ -36,6 +41,9 @@ def _public(cred: IntegrationCredential) -> dict:
         "status": cred.status,
         "ai_default_mode": cred.ai_default_mode,
         "created_at": cred.created_at,
+        "custom_context": cred.custom_context,
+        "monthly_token_limit": cred.monthly_token_limit,
+        "tokens_used_this_month": cred.tokens_used_this_month,
     }
 
 
@@ -126,6 +134,26 @@ def update_ai_mode(
         raise HTTPException(status_code=400, detail="ai_default_mode deve ser '24_7' ou 'off'")
     cred = _get_or_create(channel, current_user, session)
     cred.ai_default_mode = payload.ai_default_mode
+    session.add(cred)
+    session.commit()
+    session.refresh(cred)
+    return _public(cred)
+
+
+@router.patch("/{channel}/ai-config")
+def update_ai_config(
+    channel: str,
+    payload: AiConfigUpdate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Contexto customizado e limite mensal de tokens por IA conectada (openai/anthropic/
+    gemini) — usado por `ai_service._generate`/`_check_business_hours_and_budget`."""
+    _validate_channel(channel)
+    cred = _get_or_create(channel, current_user, session)
+    patch_data = payload.model_dump(exclude_unset=True)
+    for field, value in patch_data.items():
+        setattr(cred, field, value)
     session.add(cred)
     session.commit()
     session.refresh(cred)

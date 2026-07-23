@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlmodel import Session, select
 
 from config import settings
-from database import Contact, Conversation, ConversationMessage, IntegrationCredential, User, get_session
+from database import BusinessAISettings, Contact, Conversation, ConversationMessage, IntegrationCredential, User, get_session
 from services import activity_log_service, ai_service, crypto_service, meta_messaging_service, whatsapp_service
 from services.connection_manager import manager
 
@@ -37,6 +37,14 @@ def verify_webhook(
     ):
         return Response(content=hub_challenge, media_type="text/plain")
     return Response(status_code=403)
+
+
+def _is_group_message(msg: dict) -> bool:
+    """Checagem defensiva de mensagem de grupo — a Cloud API oficial do WhatsApp Business
+    não repassa grupos no fluxo padrão, mas alguns gateways/BSPs incluem sinais de grupo
+    no payload (JID terminando em "g.us", ou um campo "group_id" explícito)."""
+    sender = msg.get("from", "") or ""
+    return sender.endswith("g.us") or "group_id" in msg
 
 
 def _resolve_credential(channel: str, external_account_id: str, session: Session) -> Optional[IntegrationCredential]:
@@ -95,6 +103,7 @@ async def _handle_inbound_message(
     text: str,
     external_message_id: Optional[str],
     session: Session,
+    is_group: bool = False,
 ):
     cred = session.exec(
         select(IntegrationCredential).where(
@@ -130,6 +139,12 @@ async def _handle_inbound_message(
 
     if not conversation.ai_enabled:
         return
+
+    if is_group:
+        ai_settings = session.exec(select(BusinessAISettings).where(BusinessAISettings.owner_id == owner_id)).first()
+        if not ai_settings or ai_settings.ignore_whatsapp_groups:
+            logger.info("Mensagem de grupo ignorada pela IA (owner_id=%s)", owner_id)
+            return
 
     owner = session.get(User, owner_id)
     reply_text = ai_service.answer_conversation(session, owner, conversation, text)
@@ -191,6 +206,7 @@ async def receive_webhook(request: Request, session: Session = Depends(get_sessi
                         text=text,
                         external_message_id=msg.get("id"),
                         session=session,
+                        is_group=_is_group_message(msg),
                     )
         else:
             for messaging_event in entry.get("messaging", []):

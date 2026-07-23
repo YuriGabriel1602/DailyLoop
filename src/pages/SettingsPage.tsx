@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import {
-  CheckCircle2, LogOut, Moon, Plug, ScrollText, Server, ShieldCheck, Sun,
+  Bot, CheckCircle2, Clock, LogOut, Moon, Plug, ScrollText, Server, ShieldCheck, Sun,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,10 +13,38 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import { useBackendStatus } from "@/components/ui/primitives";
 import { useStore } from "@/store/useStore";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+
+interface AISettings {
+  hours_mode: "24_7" | "custom";
+  hours_start: string;
+  hours_end: string;
+  hours_days: string[];
+  out_of_hours_message: string;
+  ignore_whatsapp_groups: boolean;
+  watchdog_enabled: boolean;
+  watchdog_inactivity_minutes: number;
+}
+
+interface AIProviderConfig {
+  channel: string;
+  status: string;
+  custom_context: string | null;
+  monthly_token_limit: number | null;
+  tokens_used_this_month: number;
+}
+
+const WEEKDAYS: { key: string; label: string }[] = [
+  { key: "mon", label: "Seg" }, { key: "tue", label: "Ter" }, { key: "wed", label: "Qua" },
+  { key: "thu", label: "Qui" }, { key: "fri", label: "Sex" }, { key: "sat", label: "Sáb" }, { key: "sun", label: "Dom" },
+];
+
+const PROVIDER_LABELS: Record<string, string> = { openai: "OpenAI", anthropic: "Anthropic" };
 
 interface NotificationPreference {
   category: string;
@@ -52,10 +80,77 @@ export default function SettingsPage() {
   const [requestingCode, setRequestingCode] = useState(false);
   const [verifyingCode, setVerifyingCode] = useState(false);
   const [preferences, setPreferences] = useState<NotificationPreference[] | null>(null);
+  const [aiSettings, setAiSettings] = useState<AISettings | null>(null);
+  const [providerConfigs, setProviderConfigs] = useState<AIProviderConfig[] | null>(null);
+  const [savingAiSettings, setSavingAiSettings] = useState(false);
 
   useEffect(() => {
     api.get<NotificationPreference[]>("/api/notifications/preferences").then(setPreferences);
   }, []);
+
+  const loadAiSettings = () => {
+    api.get<AISettings>("/api/ai-settings").then(setAiSettings);
+    api.get<AIProviderConfig[]>("/api/integrations").then((all) =>
+      setProviderConfigs(all.filter((c) => c.channel === "openai" || c.channel === "anthropic"))
+    );
+  };
+
+  useEffect(() => {
+    if (mode === "business") loadAiSettings();
+  }, [mode]);
+
+  const saveAiSettings = async (patch: Partial<AISettings>) => {
+    if (!aiSettings) return;
+    const next = { ...aiSettings, ...patch };
+    setAiSettings(next);
+    setSavingAiSettings(true);
+    try {
+      await api.patch("/api/ai-settings", patch);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível salvar.");
+      loadAiSettings();
+    } finally {
+      setSavingAiSettings(false);
+    }
+  };
+
+  const toggleWeekday = (day: string) => {
+    if (!aiSettings) return;
+    const days = aiSettings.hours_days.includes(day)
+      ? aiSettings.hours_days.filter((d) => d !== day)
+      : [...aiSettings.hours_days, day];
+    saveAiSettings({ hours_days: days });
+  };
+
+  const saveProviderConfig = async (channel: string, patch: Partial<AIProviderConfig>) => {
+    setProviderConfigs((prev) => (prev ?? []).map((p) => (p.channel === channel ? { ...p, ...patch } : p)));
+    try {
+      await api.patch(`/api/integrations/${channel}/ai-config`, patch);
+      toast.success(`Configuração da ${PROVIDER_LABELS[channel]} salva.`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível salvar.");
+    }
+  };
+
+  const [outOfHoursDraft, setOutOfHoursDraft] = useState("");
+  const [watchdogMinutesDraft, setWatchdogMinutesDraft] = useState("");
+  const [providerDrafts, setProviderDrafts] = useState<Record<string, { context: string; limit: string }>>({});
+
+  useEffect(() => {
+    if (aiSettings) {
+      setOutOfHoursDraft(aiSettings.out_of_hours_message);
+      setWatchdogMinutesDraft(String(aiSettings.watchdog_inactivity_minutes));
+    }
+  }, [aiSettings]);
+
+  useEffect(() => {
+    if (!providerConfigs) return;
+    setProviderDrafts(
+      Object.fromEntries(
+        providerConfigs.map((p) => [p.channel, { context: p.custom_context ?? "", limit: p.monthly_token_limit ? String(p.monthly_token_limit) : "" }])
+      )
+    );
+  }, [providerConfigs]);
 
   useEffect(() => {
     setSection((current) => {
@@ -358,22 +453,209 @@ export default function SettingsPage() {
           )}
 
           {section === "negocio" && (
-            <Card>
-              <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Empresarial</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  Preferências de notificação por lead (ex: "novo lead recebido", "IA pausada há X tempo")
-                  ainda não têm um canal próprio — hoje o que já existe de verdade é o motor de IA do
-                  atendimento e o histórico de eventos. Sem inventar toggle que não faz nada ainda.
-                </p>
-                <Button variant="outline" asChild className="w-full justify-start gap-2">
-                  <Link to="/integrations"><Plug size={14} /> Motor de IA do atendimento (Central de Integrações)</Link>
-                </Button>
-                <Button variant="outline" asChild className="w-full justify-start gap-2">
-                  <Link to="/logs"><ScrollText size={14} /> Ver logs de tudo que está acontecendo</Link>
-                </Button>
-              </CardContent>
-            </Card>
+            <>
+              {!aiSettings ? (
+                <p className="text-sm text-muted-foreground">Carregando...</p>
+              ) : (
+                <>
+                  <Card>
+                    <CardHeader><CardTitle className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Clock size={13} /> Horário de atendimento da IA</CardTitle></CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex overflow-hidden rounded-lg border w-fit">
+                        <button
+                          onClick={() => saveAiSettings({ hours_mode: "24_7" })}
+                          className={cn("px-3 py-1.5 text-xs", aiSettings.hours_mode === "24_7" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
+                        >
+                          24/7
+                        </button>
+                        <button
+                          onClick={() => saveAiSettings({ hours_mode: "custom" })}
+                          className={cn("px-3 py-1.5 text-xs", aiSettings.hours_mode === "custom" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
+                        >
+                          Horário customizado
+                        </button>
+                      </div>
+
+                      {aiSettings.hours_mode === "custom" && (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Início</Label>
+                              <Input
+                                type="time"
+                                value={aiSettings.hours_start}
+                                onChange={(e) => saveAiSettings({ hours_start: e.target.value })}
+                                className="w-28"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Fim</Label>
+                              <Input
+                                type="time"
+                                value={aiSettings.hours_end}
+                                onChange={(e) => saveAiSettings({ hours_end: e.target.value })}
+                                className="w-28"
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">Dias ativos</Label>
+                            <div className="flex flex-wrap gap-1.5">
+                              {WEEKDAYS.map((d) => (
+                                <button
+                                  key={d.key}
+                                  onClick={() => toggleWeekday(d.key)}
+                                  className={cn(
+                                    "rounded-full border px-2.5 py-1 text-xs",
+                                    aiSettings.hours_days.includes(d.key) ? "bg-primary text-primary-foreground border-primary" : "text-muted-foreground hover:bg-muted"
+                                  )}
+                                >
+                                  {d.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      <Separator />
+
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Mensagem fora do horário (use <code className="rounded bg-muted px-1">{"{{cliente}}"}</code>)</Label>
+                        <Textarea
+                          value={outOfHoursDraft}
+                          onChange={(e) => setOutOfHoursDraft(e.target.value)}
+                          rows={3}
+                          className="text-sm"
+                        />
+                        <div className="flex justify-end">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={outOfHoursDraft === aiSettings.out_of_hours_message || savingAiSettings}
+                            onClick={() => saveAiSettings({ out_of_hours_message: outOfHoursDraft })}
+                          >
+                            Salvar mensagem
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardContent className="flex items-center justify-between pt-1">
+                      <div>
+                        <p className="text-sm font-medium">Ignorar grupos do WhatsApp</p>
+                        <p className="text-xs text-muted-foreground">A IA nunca responde mensagens vindas de um grupo.</p>
+                      </div>
+                      <Switch checked={aiSettings.ignore_whatsapp_groups} onCheckedChange={(v) => saveAiSettings({ ignore_whatsapp_groups: v })} />
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Watchdog de conversas presas</CardTitle></CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">Reativar IA automaticamente</p>
+                          <p className="text-xs text-muted-foreground">Roda a cada 15 min — reativa quem ficou preso sem resposta.</p>
+                        </div>
+                        <Switch checked={aiSettings.watchdog_enabled} onCheckedChange={(v) => saveAiSettings({ watchdog_enabled: v })} />
+                      </div>
+                      {aiSettings.watchdog_enabled && (
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs whitespace-nowrap">Considerar presa após</Label>
+                          <Input
+                            type="number"
+                            min={5}
+                            value={watchdogMinutesDraft}
+                            onChange={(e) => setWatchdogMinutesDraft(e.target.value)}
+                            onBlur={() => {
+                              const n = Math.max(5, Number(watchdogMinutesDraft) || 30);
+                              setWatchdogMinutesDraft(String(n));
+                              if (n !== aiSettings.watchdog_inactivity_minutes) saveAiSettings({ watchdog_inactivity_minutes: n });
+                            }}
+                            className="w-20"
+                          />
+                          <span className="text-xs text-muted-foreground">minutos sem resposta</span>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {providerConfigs && providerConfigs.some((p) => p.status === "connected") && (
+                    <Card>
+                      <CardHeader><CardTitle className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Bot size={13} /> IA conectada — contexto e limite de uso</CardTitle></CardHeader>
+                      <CardContent className="space-y-5">
+                        {providerConfigs.filter((p) => p.status === "connected").map((p) => {
+                          const draft = providerDrafts[p.channel] ?? { context: "", limit: "" };
+                          const pct = p.monthly_token_limit ? Math.min(100, (p.tokens_used_this_month / p.monthly_token_limit) * 100) : 0;
+                          return (
+                            <div key={p.channel} className="space-y-2.5 border-b pb-4 last:border-0 last:pb-0">
+                              <p className="text-sm font-semibold">{PROVIDER_LABELS[p.channel]}</p>
+                              <div className="space-y-1">
+                                <Label className="text-xs">Contexto customizado (instrução extra só pra essa IA)</Label>
+                                <Textarea
+                                  value={draft.context}
+                                  onChange={(e) => setProviderDrafts((prev) => ({ ...prev, [p.channel]: { ...draft, context: e.target.value } }))}
+                                  rows={2}
+                                  className="text-sm"
+                                  placeholder="Ex: Sempre mencione que fazemos entrega em até 48h."
+                                />
+                              </div>
+                              <div className="flex items-end gap-2">
+                                <div className="space-y-1">
+                                  <Label className="text-xs">Limite mensal de tokens</Label>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    value={draft.limit}
+                                    onChange={(e) => setProviderDrafts((prev) => ({ ...prev, [p.channel]: { ...draft, limit: e.target.value } }))}
+                                    placeholder="sem limite"
+                                    className="w-32"
+                                  />
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() =>
+                                    saveProviderConfig(p.channel, {
+                                      custom_context: draft.context || null,
+                                      monthly_token_limit: draft.limit ? Number(draft.limit) : null,
+                                    })
+                                  }
+                                >
+                                  Salvar
+                                </Button>
+                              </div>
+                              {p.monthly_token_limit != null && (
+                                <div className="space-y-1">
+                                  <Progress value={pct} className="h-1.5" />
+                                  <p className="font-mono text-[11px] text-muted-foreground">
+                                    {p.tokens_used_this_month.toLocaleString("pt-BR")} / {p.monthly_token_limit.toLocaleString("pt-BR")} tokens este mês
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
+              )}
+
+              <Card>
+                <CardContent className="space-y-3 pt-5">
+                  <Button variant="outline" asChild className="w-full justify-start gap-2">
+                    <Link to="/integrations"><Plug size={14} /> Central de Integrações</Link>
+                  </Button>
+                  <Button variant="outline" asChild className="w-full justify-start gap-2">
+                    <Link to="/logs"><ScrollText size={14} /> Ver logs de tudo que está acontecendo</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            </>
           )}
         </div>
       </div>

@@ -15,6 +15,7 @@ from config import settings
 from database import create_db_and_tables
 from routers import (
     admin,
+    ai_settings,
     auth,
     calendar,
     chat,
@@ -79,6 +80,7 @@ app.add_middleware(
 
 app.include_router(meta.router)
 app.include_router(auth.router)
+app.include_router(ai_settings.router)
 app.include_router(admin.router)
 app.include_router(notes.router)
 app.include_router(chat.router)

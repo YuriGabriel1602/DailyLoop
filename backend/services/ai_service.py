@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from datetime import datetime, timedelta
@@ -10,6 +11,7 @@ from sqlmodel import Session, select
 from config import settings
 from database import (
     Budget,
+    BusinessAISettings,
     Contact,
     Conversation,
     ConversationMessage,
@@ -83,7 +85,7 @@ def _get_provider_api_key(session: Session, user: User, provider: str) -> str | 
     return crypto_service.decrypt(cred.access_token_encrypted)
 
 
-def _generate_gemini(system_prompt: str, history: list[dict], prompt: str, tools=None) -> str:
+def _generate_gemini(system_prompt: str, history: list[dict], prompt: str, tools=None, usage_sink: dict | None = None) -> str:
     if not _client:
         return "Erro: Chave API do Gemini ausente no servidor backend."
     gemini_history = [
@@ -96,10 +98,12 @@ def _generate_gemini(system_prompt: str, history: list[dict], prompt: str, tools
         history=gemini_history,
     )
     response = chat.send_message(prompt)
+    if usage_sink is not None and response.usage_metadata:
+        usage_sink["tokens"] = response.usage_metadata.total_token_count or 0
     return response.text.strip()
 
 
-def _generate_openai(api_key: str | None, system_prompt: str, history: list[dict], prompt: str) -> str:
+def _generate_openai(api_key: str | None, system_prompt: str, history: list[dict], prompt: str, usage_sink: dict | None = None) -> str:
     if not api_key:
         return "Erro: Conecte sua chave da OpenAI em Integrações."
     from openai import OpenAI
@@ -109,10 +113,12 @@ def _generate_openai(api_key: str | None, system_prompt: str, history: list[dict
     messages += [{"role": h["role"], "content": h["content"]} for h in history]
     messages.append({"role": "user", "content": prompt})
     response = client.chat.completions.create(model=OPENAI_MODEL, messages=messages)
+    if usage_sink is not None and response.usage:
+        usage_sink["tokens"] = response.usage.total_tokens or 0
     return (response.choices[0].message.content or "").strip()
 
 
-def _generate_anthropic(api_key: str | None, system_prompt: str, history: list[dict], prompt: str) -> str:
+def _generate_anthropic(api_key: str | None, system_prompt: str, history: list[dict], prompt: str, usage_sink: dict | None = None) -> str:
     if not api_key:
         return "Erro: Conecte sua chave da Anthropic em Integrações."
     from anthropic import Anthropic
@@ -123,19 +129,34 @@ def _generate_anthropic(api_key: str | None, system_prompt: str, history: list[d
     response = client.messages.create(
         model=ANTHROPIC_MODEL, max_tokens=1024, system=system_prompt, messages=messages
     )
+    if usage_sink is not None and response.usage:
+        usage_sink["tokens"] = (response.usage.input_tokens or 0) + (response.usage.output_tokens or 0)
     return "".join(block.text for block in response.content if block.type == "text").strip()
 
 
-def _generate(session: Session, user: User, provider: str, system_prompt: str, history: list[dict], prompt: str, tools=None) -> str:
+def _generate(
+    session: Session,
+    user: User,
+    provider: str,
+    system_prompt: str,
+    history: list[dict],
+    prompt: str,
+    tools=None,
+    custom_context: str | None = None,
+    usage_sink: dict | None = None,
+) -> str:
     """Dispatcher único pros três provedores — ferramentas (`tools`) só existem no
     branch do Gemini hoje; OpenAI/Anthropic respondem em texto puro (sem function
-    calling) nesta primeira versão do motor plugável."""
+    calling) nesta primeira versão do motor plugável. `custom_context` (configurado por
+    IA conectada, Fase 1 do atendimento automático) é anexado ao fim do system_prompt;
+    `usage_sink`, se passado, recebe `{"tokens": N}` com o consumo real da chamada."""
     try:
+        full_prompt = f"{system_prompt}\n\n{custom_context}" if custom_context else system_prompt
         if provider == "openai":
-            return _generate_openai(_get_provider_api_key(session, user, "openai"), system_prompt, history, prompt)
+            return _generate_openai(_get_provider_api_key(session, user, "openai"), full_prompt, history, prompt, usage_sink=usage_sink)
         if provider == "anthropic":
-            return _generate_anthropic(_get_provider_api_key(session, user, "anthropic"), system_prompt, history, prompt)
-        return _generate_gemini(system_prompt, history, prompt, tools)
+            return _generate_anthropic(_get_provider_api_key(session, user, "anthropic"), full_prompt, history, prompt, usage_sink=usage_sink)
+        return _generate_gemini(full_prompt, history, prompt, tools, usage_sink=usage_sink)
     except Exception:
         logger.exception("Falha ao chamar o provedor de IA '%s'", provider)
         return "O núcleo de IA está processando em modo offline. Tente novamente em breve."
@@ -349,13 +370,81 @@ def _load_conversation_history(session: Session, conversation_id: int) -> list[d
     return [{"role": "assistant" if m.direction == "outbound" else "user", "content": m.content} for m in messages]
 
 
+WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+
+
+def _ensure_current_month(cred: IntegrationCredential) -> None:
+    """Zera o contador de tokens do mês quando o mês vira — mesma credencial guarda o
+    consumo pra Fase 1 (limite mensal por IA conectada)."""
+    current_month = datetime.utcnow().strftime("%Y-%m")
+    if cred.usage_reset_month != current_month:
+        cred.tokens_used_this_month = 0
+        cred.usage_reset_month = current_month
+
+
+def _check_business_hours_and_budget(session: Session, user: User, contact_name: str) -> str | None:
+    """Devolve a mensagem de fora-do-expediente se o atendimento automático estiver fora
+    do horário configurado ou se a IA conectada já estourou o limite mensal de tokens —
+    None se pode responder normalmente. Sem `BusinessAISettings` configurado, o padrão é
+    24/7 sem limite (comportamento idêntico ao de antes desta feature existir)."""
+    ai_settings = session.exec(select(BusinessAISettings).where(BusinessAISettings.owner_id == user.id)).first()
+
+    if ai_settings and ai_settings.hours_mode == "custom":
+        now = datetime.utcnow()
+        today_key = WEEKDAY_KEYS[now.weekday()]
+        active_days = json.loads(ai_settings.hours_days)
+        current_time = now.strftime("%H:%M")
+        in_hours = today_key in active_days and ai_settings.hours_start <= current_time <= ai_settings.hours_end
+        if not in_hours:
+            return ai_settings.out_of_hours_message.replace("{{cliente}}", contact_name)
+
+    provider = user.ai_provider_business or "gemini"
+    cred = session.exec(
+        select(IntegrationCredential).where(IntegrationCredential.owner_id == user.id, IntegrationCredential.channel == provider)
+    ).first()
+    if cred and cred.monthly_token_limit:
+        _ensure_current_month(cred)
+        session.add(cred)
+        session.commit()
+        if cred.tokens_used_this_month >= cred.monthly_token_limit:
+            fallback_message = ai_settings.out_of_hours_message if ai_settings else BusinessAISettings.model_fields["out_of_hours_message"].default
+            return fallback_message.replace("{{cliente}}", contact_name)
+
+    return None
+
+
 def answer_conversation(session: Session, user: User, conversation: Conversation, incoming_text: str) -> str:
     """Equivalente a `ask_prometheus`, mas pro inbox de atendimento: histórico por
     conversa (não por usuário) e sem as ferramentas de tarefas/finanças pessoais.
-    Provedor resolvido por `user.ai_provider_business`."""
+    Provedor resolvido por `user.ai_provider_business`. Antes de gerar de verdade, checa
+    horário de atendimento e limite mensal de tokens (Fase 1 do atendimento automático)."""
+    contact = session.get(Contact, conversation.contact_id)
+    contact_name = contact.name if contact else "cliente"
+
+    blocked_message = _check_business_hours_and_budget(session, user, contact_name)
+    if blocked_message:
+        return blocked_message
+
     provider = user.ai_provider_business or "gemini"
     history = _load_conversation_history(session, conversation.id)
-    return _generate(session, user, provider, CONVERSATION_SYSTEM_PROMPT, history, incoming_text)
+    cred = session.exec(
+        select(IntegrationCredential).where(IntegrationCredential.owner_id == user.id, IntegrationCredential.channel == provider)
+    ).first()
+    custom_context = cred.custom_context if cred else None
+
+    usage_sink: dict = {}
+    reply = _generate(
+        session, user, provider, CONVERSATION_SYSTEM_PROMPT, history, incoming_text,
+        custom_context=custom_context, usage_sink=usage_sink,
+    )
+
+    if cred and usage_sink.get("tokens"):
+        _ensure_current_month(cred)
+        cred.tokens_used_this_month += usage_sink["tokens"]
+        session.add(cred)
+        session.commit()
+
+    return reply
 
 
 JOURNAL_SYSTEM_PROMPT = """
