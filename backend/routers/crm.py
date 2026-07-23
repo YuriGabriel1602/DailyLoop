@@ -4,13 +4,17 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from database import Contact, User, get_session
+from database import Contact, ContactTag, Tag, User, get_session
 from services import activity_log_service
 from services.auth_service import get_current_user
 
 router = APIRouter(prefix="/api/crm", tags=["crm"])
 
 STAGES = ["novo", "qualificado", "convertido", "perdido"]
+
+
+class TagIdsUpdate(BaseModel):
+    tag_ids: list[int]
 
 
 class ContactCreate(BaseModel):
@@ -47,7 +51,20 @@ def list_contacts(
         .where(Contact.owner_id == current_user.id)
         .order_by(Contact.created_at.desc())
     )
-    return session.exec(statement).all()
+    contacts = session.exec(statement).all()
+
+    tags_by_id = {t.id: t for t in session.exec(select(Tag).where(Tag.owner_id == current_user.id)).all()}
+    contact_ids = [c.id for c in contacts]
+    links = (
+        session.exec(select(ContactTag).where(ContactTag.contact_id.in_(contact_ids))).all() if contact_ids else []
+    )
+    tags_per_contact: dict[int, list[dict]] = {}
+    for link in links:
+        tag = tags_by_id.get(link.tag_id)
+        if tag:
+            tags_per_contact.setdefault(link.contact_id, []).append({"id": tag.id, "name": tag.name, "color": tag.color})
+
+    return [{**c.model_dump(), "tags": tags_per_contact.get(c.id, [])} for c in contacts]
 
 
 @router.post("/contacts")
@@ -110,6 +127,27 @@ def move_contact_stage(
         f"{db_contact.name} movido para '{patch.stage}'",
     )
     return db_contact
+
+
+@router.put("/contacts/{contact_id}/tags")
+def set_contact_tags(
+    contact_id: int,
+    payload: TagIdsUpdate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _get_owned_contact(contact_id, current_user, session)
+    owned_tag_ids = {
+        t.id for t in session.exec(select(Tag).where(Tag.owner_id == current_user.id, Tag.id.in_(payload.tag_ids))).all()
+    }
+    for link in session.exec(select(ContactTag).where(ContactTag.contact_id == contact_id)).all():
+        session.delete(link)
+    for tag_id in owned_tag_ids:
+        session.add(ContactTag(contact_id=contact_id, tag_id=tag_id))
+    session.commit()
+
+    tags = session.exec(select(Tag).where(Tag.id.in_(owned_tag_ids))).all() if owned_tag_ids else []
+    return [{"id": t.id, "name": t.name, "color": t.color} for t in tags]
 
 
 @router.delete("/contacts/{contact_id}")

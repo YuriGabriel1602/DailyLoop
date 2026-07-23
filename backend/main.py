@@ -37,6 +37,7 @@ from routers import (
     notifications,
     people,
     rituals,
+    tags,
     tasks,
     webhooks,
 )
@@ -103,6 +104,7 @@ app.include_router(hive.router)
 app.include_router(calendar.router)
 app.include_router(gmail.router)
 app.include_router(fit.router)
+app.include_router(tags.router)
 
 
 @app.on_event("startup")

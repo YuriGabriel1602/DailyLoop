@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import {
-  Bot, CheckCircle2, Clock, LogOut, Moon, Plug, ScrollText, Server, ShieldCheck, Sun,
+  Bot, CheckCircle2, Clock, LogOut, Moon, Plug, ScrollText, Server, ShieldCheck, Sun, Tag as TagIcon, Trash2,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,7 +65,17 @@ const PERSONAL_CATEGORIES = ["task_reminder", "daily_briefing", "budget_alert"];
 const SECURITY_CATEGORIES = ["password_reset"];
 const BUSINESS_CATEGORIES = ["inbox_new_message", "watchdog_reactivated"];
 
-type Section = "conta" | "aparencia" | "seguranca" | "notificacoes" | "negocio";
+type Section = "conta" | "aparencia" | "seguranca" | "notificacoes" | "negocio" | "tags";
+
+interface TagItem {
+  id: number;
+  name: string;
+  color: string;
+}
+
+const TAG_COLOR_OPTIONS = [
+  "#3987e5", "#008300", "#d55181", "#c98500", "#199e70", "#d95926", "#9085e9", "#e66767",
+];
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -155,10 +165,42 @@ export default function SettingsPage() {
     );
   }, [providerConfigs]);
 
+  const [tags, setTags] = useState<TagItem[] | null>(null);
+  const [newTagName, setNewTagName] = useState("");
+  const [newTagColor, setNewTagColor] = useState(TAG_COLOR_OPTIONS[0]);
+  const [creatingTag, setCreatingTag] = useState(false);
+
+  useEffect(() => {
+    if (mode === "business") api.get<TagItem[]>("/api/tags").then(setTags);
+  }, [mode]);
+
+  const createTag = async () => {
+    if (!newTagName.trim()) return;
+    setCreatingTag(true);
+    try {
+      const created = await api.post<TagItem>("/api/tags", { name: newTagName.trim(), color: newTagColor });
+      setTags((prev) => [...(prev ?? []), created]);
+      setNewTagName("");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível criar a tag.");
+    } finally {
+      setCreatingTag(false);
+    }
+  };
+
+  const deleteTag = async (id: number) => {
+    setTags((prev) => (prev ?? []).filter((t) => t.id !== id));
+    try {
+      await api.delete(`/api/tags/${id}`);
+    } catch {
+      toast.error("Não foi possível apagar a tag.");
+    }
+  };
+
   useEffect(() => {
     setSection((current) => {
       if (mode === "business" && current === "notificacoes") return "conta";
-      if (mode === "personal" && current === "negocio") return "conta";
+      if (mode === "personal" && (current === "negocio" || current === "tags")) return "conta";
       return current;
     });
   }, [mode]);
@@ -231,7 +273,7 @@ export default function SettingsPage() {
       ],
     },
     mode === "business"
-      ? { label: "Empresarial", items: [{ id: "negocio", label: "Notificações & Automação" }] }
+      ? { label: "Empresarial", items: [{ id: "negocio", label: "Notificações & Automação" }, { id: "tags", label: "Tags" }] }
       : { label: "Pessoal", items: [{ id: "notificacoes", label: "Notificações" }] },
   ];
 
@@ -677,6 +719,54 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
             </>
+          )}
+
+          {section === "tags" && (
+            <Card>
+              <CardHeader><CardTitle className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><TagIcon size={13} /> Tags do CRM</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={newTagName}
+                    onChange={(e) => setNewTagName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && createTag()}
+                    placeholder="Nome da tag (ex: VIP)"
+                    className="flex-1"
+                  />
+                  <div className="flex gap-1">
+                    {TAG_COLOR_OPTIONS.map((color) => (
+                      <button
+                        key={color}
+                        onClick={() => setNewTagColor(color)}
+                        className={cn("size-6 rounded-full border-2", newTagColor === color ? "border-foreground" : "border-transparent")}
+                        style={{ background: color }}
+                      />
+                    ))}
+                  </div>
+                  <Button size="sm" onClick={createTag} disabled={creatingTag || !newTagName.trim()}>Criar</Button>
+                </div>
+
+                {!tags ? (
+                  <p className="text-sm text-muted-foreground">Carregando...</p>
+                ) : tags.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhuma tag criada ainda.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {tags.map((tag) => (
+                      <div key={tag.id} className="flex items-center justify-between rounded-lg border px-3 py-2">
+                        <span className="inline-flex items-center gap-2 text-sm">
+                          <span className="size-2.5 rounded-full" style={{ background: tag.color }} />
+                          {tag.name}
+                        </span>
+                        <button onClick={() => deleteTag(tag.id)} className="text-muted-foreground hover:text-destructive">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           )}
         </div>
       </div>
