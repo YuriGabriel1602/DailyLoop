@@ -57,25 +57,28 @@ def send_whatsapp_template(to: str, template_name: str, body_params: list[str]) 
         return False
 
 
-def send_whatsapp_text(to: str, body: str) -> bool:
-    """Envia texto livre via WhatsApp Business Cloud API. Só funciona dentro da janela
-    de 24h de uma conversa iniciada pelo contato (regra da Meta) — para iniciar contato
-    fora dessa janela é obrigatório usar `send_whatsapp_template`."""
-    if not _is_configured():
-        logger.warning("WhatsApp não configurado — mensagem de texto para %s não foi enviada.", to)
+def send_whatsapp_text(to: str, body: str, *, access_token: str, phone_number_id: str) -> bool:
+    """Envia texto livre via WhatsApp Business Cloud API, usando o token e o
+    phone_number_id do WhatsApp CONECTADO pelo dono do negócio (`IntegrationCredential`
+    channel="whatsapp") — nunca o número global de plataforma de `settings.whatsapp_*`,
+    que é só pro DailyLoop notificar os próprios usuários do app (senha, lembretes etc,
+    via `send_whatsapp_template`). Só funciona dentro da janela de 24h de uma conversa
+    iniciada pelo contato (regra da Meta) — para iniciar contato fora dessa janela é
+    obrigatório usar um template aprovado."""
+    if not access_token or not phone_number_id:
+        logger.warning(
+            "WhatsApp do negócio não conectado (falta token ou phone_number_id) — texto para %s não foi enviado.", to
+        )
         return False
 
-    url = (
-        f"https://graph.facebook.com/{settings.whatsapp_api_version}/"
-        f"{settings.whatsapp_phone_number_id}/messages"
-    )
+    url = f"https://graph.facebook.com/{settings.whatsapp_api_version}/{phone_number_id}/messages"
     payload = {
         "messaging_product": "whatsapp",
         "to": to.lstrip("+"),
         "type": "text",
         "text": {"body": body},
     }
-    headers = {"Authorization": f"Bearer {settings.whatsapp_access_token}", "Content-Type": "application/json"}
+    headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
 
     try:
         with httpx.Client(timeout=10.0) as client:

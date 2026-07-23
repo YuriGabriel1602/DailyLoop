@@ -122,6 +122,7 @@ async def _handle_inbound_message(
     external_message_id: Optional[str],
     session: Session,
     is_group: bool = False,
+    whatsapp_phone_number_id: str = "",
 ):
     cred = session.exec(
         select(IntegrationCredential).where(
@@ -182,7 +183,10 @@ async def _handle_inbound_message(
     session.refresh(outbound)
 
     if channel == "whatsapp":
-        whatsapp_service.send_whatsapp_text(contact_external_id, reply_text)
+        token = crypto_service.decrypt(cred.access_token_encrypted) if cred and cred.access_token_encrypted else ""
+        whatsapp_service.send_whatsapp_text(
+            contact_external_id, reply_text, access_token=token, phone_number_id=whatsapp_phone_number_id
+        )
     elif cred and cred.access_token_encrypted:
         token = crypto_service.decrypt(cred.access_token_encrypted)
         meta_messaging_service.send_meta_text(
@@ -220,6 +224,16 @@ async def receive_webhook(request: Request, session: Session = Depends(get_sessi
         if channel == "whatsapp":
             for change in entry.get("changes", []):
                 value = change.get("value", {})
+
+                # O WABA ID (entry.id, usado acima só pra achar a credencial certa) não é
+                # suficiente pra ENVIAR — precisa do phone_number_id do número de verdade,
+                # que só vem no payload de cada mensagem recebida. Guarda na primeira vez.
+                metadata_phone_id = value.get("metadata", {}).get("phone_number_id", "")
+                if metadata_phone_id and cred.phone_number_id != metadata_phone_id:
+                    cred.phone_number_id = metadata_phone_id
+                    session.add(cred)
+                    session.commit()
+
                 names_by_wa_id = {
                     c.get("wa_id"): c.get("profile", {}).get("name", "") for c in value.get("contacts", [])
                 }
@@ -237,6 +251,7 @@ async def receive_webhook(request: Request, session: Session = Depends(get_sessi
                         external_message_id=msg.get("id"),
                         session=session,
                         is_group=_is_group_message(msg),
+                        whatsapp_phone_number_id=cred.phone_number_id,
                     )
         else:
             for messaging_event in entry.get("messaging", []):

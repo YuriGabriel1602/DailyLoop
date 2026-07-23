@@ -40,7 +40,18 @@ def _send_to_channel(conversation: Conversation, content: str, session: Session)
         return False
 
     if conversation.channel == "whatsapp":
-        return whatsapp_service.send_whatsapp_text(contact.external_id, content)
+        cred = session.exec(
+            select(IntegrationCredential).where(
+                IntegrationCredential.owner_id == conversation.owner_id, IntegrationCredential.channel == "whatsapp"
+            )
+        ).first()
+        if not cred or not cred.access_token_encrypted or not cred.phone_number_id:
+            logger.warning("WhatsApp do negócio sem conexão completa — mensagem só salva localmente.")
+            return False
+        token = crypto_service.decrypt(cred.access_token_encrypted)
+        return whatsapp_service.send_whatsapp_text(
+            contact.external_id, content, access_token=token, phone_number_id=cred.phone_number_id
+        )
 
     if conversation.channel == "email":
         account = session.exec(

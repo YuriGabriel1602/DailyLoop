@@ -1,5 +1,6 @@
 import json
 from typing import Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -20,6 +21,7 @@ def _public(settings_row: BusinessAISettings) -> dict:
         "hours_start": settings_row.hours_start,
         "hours_end": settings_row.hours_end,
         "hours_days": json.loads(settings_row.hours_days),
+        "timezone": settings_row.timezone,
         "out_of_hours_message": settings_row.out_of_hours_message,
         "ignore_whatsapp_groups": settings_row.ignore_whatsapp_groups,
         "watchdog_enabled": settings_row.watchdog_enabled,
@@ -32,6 +34,7 @@ class AISettingsUpdate(BaseModel):
     hours_start: Optional[str] = None
     hours_end: Optional[str] = None
     hours_days: Optional[list[str]] = None
+    timezone: Optional[str] = None
     out_of_hours_message: Optional[str] = None
     ignore_whatsapp_groups: Optional[bool] = None
     watchdog_enabled: Optional[bool] = None
@@ -71,6 +74,11 @@ def update_ai_settings(
         patch_data["hours_days"] = json.dumps(patch_data["hours_days"])
     if "watchdog_inactivity_minutes" in patch_data and patch_data["watchdog_inactivity_minutes"] < 5:
         raise HTTPException(status_code=400, detail="watchdog_inactivity_minutes mínimo é 5")
+    if "timezone" in patch_data:
+        try:
+            ZoneInfo(patch_data["timezone"])
+        except ZoneInfoNotFoundError:
+            raise HTTPException(status_code=400, detail="timezone inválido — use um nome IANA, ex: America/Sao_Paulo")
 
     for field, value in patch_data.items():
         setattr(settings_row, field, value)

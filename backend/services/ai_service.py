@@ -3,6 +3,7 @@ import logging
 import os
 from datetime import datetime, timedelta
 from decimal import Decimal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from google import genai
 from google.genai import types
@@ -373,6 +374,15 @@ def _load_conversation_history(session: Session, conversation_id: int) -> list[d
 WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
 
+def _time_in_range(start: str, end: str, current: str) -> bool:
+    """Compara horários "HH:MM" cobrindo também janelas que atravessam a meia-noite
+    (ex: 22:00-06:00) — uma comparação direta start<=current<=end nunca é verdadeira
+    nesse caso, porque start > end como strings."""
+    if start <= end:
+        return start <= current <= end
+    return current >= start or current <= end
+
+
 def _ensure_current_month(cred: IntegrationCredential) -> None:
     """Zera o contador de tokens do mês quando o mês vira — mesma credencial guarda o
     consumo pra Fase 1 (limite mensal por IA conectada)."""
@@ -390,11 +400,15 @@ def _check_business_hours_and_budget(session: Session, user: User, contact_name:
     ai_settings = session.exec(select(BusinessAISettings).where(BusinessAISettings.owner_id == user.id)).first()
 
     if ai_settings and ai_settings.hours_mode == "custom":
-        now = datetime.utcnow()
-        today_key = WEEKDAY_KEYS[now.weekday()]
+        try:
+            tz = ZoneInfo(ai_settings.timezone or "America/Sao_Paulo")
+        except ZoneInfoNotFoundError:
+            tz = ZoneInfo("America/Sao_Paulo")
+        now_local = datetime.now(tz)
+        today_key = WEEKDAY_KEYS[now_local.weekday()]
         active_days = json.loads(ai_settings.hours_days)
-        current_time = now.strftime("%H:%M")
-        in_hours = today_key in active_days and ai_settings.hours_start <= current_time <= ai_settings.hours_end
+        current_time = now_local.strftime("%H:%M")
+        in_hours = today_key in active_days and _time_in_range(ai_settings.hours_start, ai_settings.hours_end, current_time)
         if not in_hours:
             return ai_settings.out_of_hours_message.replace("{{cliente}}", contact_name)
 

@@ -126,6 +126,9 @@ class IntegrationCredential(SQLModel, table=True):
     owner_id: int = Field(foreign_key="user.id")
     channel: str  # whatsapp, instagram, facebook
     external_account_id: str = ""  # WABA ID / IG business ID / Page ID
+    phone_number_id: str = ""  # só canal "whatsapp" — capturado automaticamente do primeiro
+    # webhook recebido (value.metadata.phone_number_id), pois é o WABA ID (external_account_id)
+    # que identifica a conta pra receber, mas o phone_number_id que identifica o número pra enviar.
     access_token_encrypted: str = ""
     status: str = "disconnected"  # disconnected, connected
     ai_default_mode: str = "24_7"  # 24_7, off
@@ -148,6 +151,10 @@ class BusinessAISettings(SQLModel, table=True):
     hours_start: str = "09:00"
     hours_end: str = "18:00"
     hours_days: str = '["mon","tue","wed","thu","fri","sat","sun"]'  # JSON
+    # Fuso IANA em que hours_start/hours_end são interpretados — sem isso, a checagem de
+    # horário comparava direto contra UTC, adiantando/atrasando o expediente conforme o
+    # fuso de quem configurou.
+    timezone: str = "America/Sao_Paulo"
     out_of_hours_message: str = (
         "Olá {{cliente}}, no momento estamos fora do horário de atendimento. Já te respondemos assim que possível!"
     )
@@ -321,6 +328,8 @@ def _run_lightweight_migrations():
         ("integrationcredential", "monthly_token_limit", "ALTER TABLE integrationcredential ADD COLUMN monthly_token_limit INTEGER"),
         ("integrationcredential", "tokens_used_this_month", "ALTER TABLE integrationcredential ADD COLUMN tokens_used_this_month INTEGER DEFAULT 0"),
         ("integrationcredential", "usage_reset_month", "ALTER TABLE integrationcredential ADD COLUMN usage_reset_month VARCHAR"),
+        ("integrationcredential", "phone_number_id", "ALTER TABLE integrationcredential ADD COLUMN phone_number_id VARCHAR DEFAULT ''"),
+        ("businessaisettings", "timezone", "ALTER TABLE businessaisettings ADD COLUMN timezone VARCHAR DEFAULT 'America/Sao_Paulo'"),
     ]
     with engine.connect() as conn:
         for table_name, column_name, ddl in migrations:
