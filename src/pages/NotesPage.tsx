@@ -56,7 +56,16 @@ export default function NotesPage() {
 
   return (
     <div className="h-full w-full overflow-y-auto overflow-x-hidden pb-28">
-      <PageHeader title="Notas" description="Tudo que você descarregou na Captura Rápida, num só lugar." />
+      <PageHeader
+        title="Notas"
+        description="Tudo que você descarregou na Captura Rápida, num só lugar."
+        help={
+          <p>
+            Notas soltas e rápidas — sem categoria, sem prazo. Um lugar pra descarregar uma ideia sem
+            precisar decidir na hora se vira tarefa ou não. Use <kbd className="rounded border px-1 font-mono text-[10px]">Ctrl+Enter</kbd> pra salvar.
+          </p>
+        }
+      />
       <div className="mx-auto w-full max-w-2xl flex-1 space-y-6 px-4 md:px-6">
         <Card className="gap-2 p-3">
           <textarea

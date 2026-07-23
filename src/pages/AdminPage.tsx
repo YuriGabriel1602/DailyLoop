@@ -48,7 +48,16 @@ export default function AdminPage() {
 
   return (
     <div className="h-full w-full overflow-y-auto overflow-x-hidden pb-28">
-      <PageHeader title="Administração" description="Usuários e logs do sistema." />
+      <PageHeader
+        title="Administração"
+        description="Usuários e logs do sistema."
+        help={
+          <p>
+            Visível só pra contas com papel de administrador (o primeiro usuário criado no sistema). Gerencie
+            usuários — ative, desative, force reset de senha — e acompanhe o log de arquivo do servidor.
+          </p>
+        }
+      />
       <div className="mx-auto w-full max-w-5xl space-y-4 px-4 md:space-y-6 md:px-6">
         <Card>
           <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Usuários</CardTitle></CardHeader>

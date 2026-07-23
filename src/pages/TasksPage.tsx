@@ -70,7 +70,16 @@ export default function TasksPage() {
 
   return (
     <div className="flex h-full w-full flex-col overflow-y-auto overflow-x-hidden pb-28">
-      <PageHeader title="Tarefas" description="O que precisa da sua atenção hoje." />
+      <PageHeader
+        title="Tarefas"
+        description="O que precisa da sua atenção hoje."
+        help={
+          <>
+            <p>Lista de tarefas do lado Pessoal. Crie, marque como concluída, defina prioridade e data.</p>
+            <p>A categoria de cada tarefa alimenta a tela de <strong className="text-foreground">Áreas da Vida</strong> e o Mapa de Calor do Painel — por isso vale usar sempre a mesma categoria pra assuntos parecidos.</p>
+          </>
+        }
+      />
       <div className="mx-auto w-full max-w-2xl flex-1 space-y-6 px-4 md:px-6">
         <Card className="gap-2 p-2">
           <div className="flex items-center gap-2">
