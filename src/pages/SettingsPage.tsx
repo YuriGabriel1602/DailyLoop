@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { useTheme } from "next-themes";
 import { toast } from "sonner";
-import { CheckCircle2, LogOut, MessageCircle, Server, ShieldCheck } from "lucide-react";
+import {
+  CheckCircle2, LogOut, Moon, Plug, ScrollText, Server, ShieldCheck, Sun,
+} from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +16,7 @@ import { Separator } from "@/components/ui/separator";
 import { useBackendStatus } from "@/components/ui/primitives";
 import { useStore } from "@/store/useStore";
 import { api, ApiError } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 interface NotificationPreference {
   category: string;
@@ -27,14 +31,20 @@ const CATEGORY_LABELS: Record<string, string> = {
   budget_alert: "Alerta financeiro",
 };
 
+const PERSONAL_CATEGORIES = ["task_reminder", "daily_briefing", "budget_alert"];
+const SECURITY_CATEGORIES = ["password_reset"];
+
+type Section = "conta" | "aparencia" | "seguranca" | "notificacoes" | "negocio";
+
 export default function SettingsPage() {
   const navigate = useNavigate();
   const isBackendOnline = useBackendStatus();
   const user = useStore((s) => s.user);
   const updateUser = useStore((s) => s.updateUser);
   const logout = useStore((s) => s.logout);
-  const [toggles, setToggles] = useState([true, false, true]);
-  const handleToggle = (index: number) => setToggles((prev) => prev.map((v, i) => (i === index ? !v : v)));
+  const mode = useStore((s) => s.mode);
+  const { theme, setTheme } = useTheme();
+  const [section, setSection] = useState<Section>("conta");
 
   const [phone, setPhone] = useState(user?.phone_number ?? "");
   const [code, setCode] = useState("");
@@ -46,6 +56,14 @@ export default function SettingsPage() {
   useEffect(() => {
     api.get<NotificationPreference[]>("/api/notifications/preferences").then(setPreferences);
   }, []);
+
+  useEffect(() => {
+    setSection((current) => {
+      if (mode === "business" && current === "notificacoes") return "conta";
+      if (mode === "personal" && current === "negocio") return "conta";
+      return current;
+    });
+  }, [mode]);
 
   const handleLogout = () => {
     logout();
@@ -105,149 +123,259 @@ export default function SettingsPage() {
     }
   };
 
+  const NAV_GROUPS: { label: string; items: { id: Section; label: string }[] }[] = [
+    {
+      label: "Geral",
+      items: [
+        { id: "conta", label: "Conta" },
+        { id: "aparencia", label: "Aparência" },
+        { id: "seguranca", label: "Segurança" },
+      ],
+    },
+    mode === "business"
+      ? { label: "Empresarial", items: [{ id: "negocio", label: "Notificações & Automação" }] }
+      : { label: "Pessoal", items: [{ id: "notificacoes", label: "Notificações" }] },
+  ];
+
+  const personalPrefs = preferences?.filter((p) => PERSONAL_CATEGORIES.includes(p.category)) ?? [];
+  const securityPrefs = preferences?.filter((p) => SECURITY_CATEGORIES.includes(p.category)) ?? [];
+
   return (
-    <div className="h-full w-full overflow-y-auto overflow-x-hidden pb-28">
-      <PageHeader title="Configurações" description="Conta, notificações e preferências." />
-      <div className="mx-auto w-full max-w-2xl space-y-4 px-4 md:space-y-6 md:px-6">
-        <Card>
-          <CardContent className="flex items-center gap-3 pt-1">
-            <div className={`flex size-9 items-center justify-center rounded-full ${isBackendOnline ? "bg-emerald-500/10 text-emerald-500" : "bg-destructive/10 text-destructive"}`}>
-              <Server size={16} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium">Estado do backend</p>
-              <p className="text-xs text-muted-foreground">
-                {isBackendOnline ? "Comunicação estabelecida com sucesso." : "Servidor Python offline. Execute main.py."}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Conta</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Username</span><span className="font-medium">{user?.username}</span></div>
-            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Email</span><span className="truncate font-medium">{user?.email}</span></div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Papel</span>
-              <Badge variant="outline">{user?.role}</Badge>
-            </div>
-            {user?.role === "admin" && (
-              <>
-                <Separator />
-                <Button variant="outline" asChild className="w-full gap-2">
-                  <Link to="/admin"><ShieldCheck size={14} /> Painel de administração</Link>
-                </Button>
-              </>
-            )}
-            <Button variant="destructive" onClick={handleLogout} className="w-full gap-2">
-              <LogOut size={14} /> Sair
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <MessageCircle size={13} /> WhatsApp
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="phone">Telefone (formato internacional)</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="phone"
-                  placeholder="+5511999999999"
-                  value={phone}
-                  onChange={(e) => { setPhone(e.target.value); setCodeSent(false); }}
-                  disabled={requestingCode}
-                />
-                <Button variant="outline" onClick={requestCode} disabled={requestingCode || !phone.trim()} className="shrink-0">
-                  {requestingCode ? "Enviando..." : "Enviar código"}
-                </Button>
+    <div className="flex h-full w-full flex-col overflow-hidden">
+      <PageHeader
+        title="Sistema"
+        description="Conta, aparência e notificações."
+        help={
+          <p>
+            Configurações da sua conta — dados de perfil, tema claro/escuro, segurança, notificações e o
+            motor de IA (Gemini/OpenAI/Anthropic) usado pelo Prometheus em cada mundo. Fica escondido da
+            navegação principal de propósito; acesse pelo menu do seu usuário, no canto inferior.
+          </p>
+        }
+      />
+      <div className="mx-auto flex w-full max-w-4xl flex-1 gap-6 overflow-hidden px-4 py-4 md:px-6">
+        <nav className="w-44 shrink-0 space-y-4">
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label}>
+              <p className="mb-1 px-2 font-mono text-[10px] tracking-wider text-muted-foreground uppercase">{group.label}</p>
+              <div className="space-y-0.5">
+                {group.items.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setSection(item.id)}
+                    className={cn(
+                      "block w-full rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors",
+                      section === item.id ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:bg-muted"
+                    )}
+                  >
+                    {item.label}
+                  </button>
+                ))}
               </div>
-              {user?.phone_verified && user.phone_number === phone && !codeSent && (
-                <p className="flex items-center gap-1 text-xs text-emerald-500"><CheckCircle2 size={12} /> Telefone verificado</p>
-              )}
             </div>
+          ))}
+        </nav>
 
-            {codeSent && (
-              <div className="space-y-1.5 rounded-lg border bg-muted/30 p-3">
-                <Label htmlFor="code">Código recebido por WhatsApp</Label>
-                <div className="flex gap-2">
-                  <Input id="code" placeholder="000000" maxLength={6} value={code} onChange={(e) => setCode(e.target.value)} />
-                  <Button onClick={verifyCode} disabled={verifyingCode || code.length !== 6} className="shrink-0">
-                    {verifyingCode ? "Verificando..." : "Verificar"}
+        <div className="flex-1 space-y-4 overflow-y-auto pb-10">
+          {section === "conta" && (
+            <>
+              <Card>
+                <CardContent className="flex items-center gap-3 pt-1">
+                  <div className={cn("flex size-9 items-center justify-center rounded-full", isBackendOnline ? "bg-emerald-500/10 text-emerald-500" : "bg-destructive/10 text-destructive")}>
+                    <Server size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Estado do backend</p>
+                    <p className="text-xs text-muted-foreground">
+                      {isBackendOnline ? "Comunicação estabelecida com sucesso." : "Servidor Python offline. Execute main.py."}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Conta</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Username</span><span className="font-medium">{user?.username}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Email</span><span className="truncate font-medium">{user?.email}</span></div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Papel</span>
+                    <Badge variant="outline">{user?.role}</Badge>
+                  </div>
+                  {user?.role === "admin" && (
+                    <>
+                      <Separator />
+                      <Button variant="outline" asChild className="w-full gap-2">
+                        <Link to="/admin"><ShieldCheck size={14} /> Painel de administração</Link>
+                      </Button>
+                    </>
+                  )}
+                  <Button variant="destructive" onClick={handleLogout} className="w-full gap-2">
+                    <LogOut size={14} /> Sair
                   </Button>
-                </div>
-                <button onClick={requestCode} disabled={requestingCode} className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground">
-                  Reenviar código
-                </button>
-              </div>
-            )}
+                </CardContent>
+              </Card>
+            </>
+          )}
 
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Receber notificações por WhatsApp</p>
-                <p className="text-xs text-muted-foreground">
-                  {user?.phone_verified ? "Telefone verificado." : "Verifique seu telefone primeiro."}
-                </p>
-              </div>
-              <Switch
-                checked={user?.whatsapp_opted_in ?? false}
-                disabled={!user?.phone_verified}
-                onCheckedChange={toggleWhatsappOptIn}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {preferences && (
-          <Card>
-            <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Canais por categoria</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              {preferences.map((pref) => (
-                <div key={pref.category} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
-                  <p className="text-sm font-medium">{CATEGORY_LABELS[pref.category] ?? pref.category}</p>
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      Email
-                      <Switch checked={pref.email_enabled} onCheckedChange={(v) => updatePreference(pref.category, { email_enabled: v })} />
-                    </label>
-                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      WhatsApp
-                      <Switch
-                        checked={pref.whatsapp_enabled}
-                        disabled={!user?.whatsapp_opted_in}
-                        onCheckedChange={(v) => updatePreference(pref.category, { whatsapp_enabled: v })}
-                      />
-                    </label>
+          {section === "aparencia" && (
+            <Card>
+              <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Aparência</CardTitle></CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Tema</p>
+                    <p className="text-xs text-muted-foreground">Claro ou escuro, aplicado em todo o sistema.</p>
+                  </div>
+                  <div className="flex overflow-hidden rounded-lg border">
+                    <button
+                      onClick={() => setTheme("light")}
+                      className={cn("flex items-center gap-1.5 px-3 py-1.5 text-xs", theme === "light" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
+                    >
+                      <Sun size={13} /> Claro
+                    </button>
+                    <button
+                      onClick={() => setTheme("dark")}
+                      className={cn("flex items-center gap-1.5 px-3 py-1.5 text-xs", theme === "dark" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
+                    >
+                      <Moon size={13} /> Escuro
+                    </button>
                   </div>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+              </CardContent>
+            </Card>
+          )}
 
-        <Card>
-          <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Preferências</CardTitle></CardHeader>
-          <CardContent className="space-y-1">
-            {[
-              { title: "Foco Estrito", desc: "Bloqueia distrações" },
-              { title: "Áudio", desc: "Avisos sonoros" },
-              { title: "Animações", desc: "Efeitos de transição" },
-            ].map((item, i) => (
-              <div key={item.title} className="flex items-center justify-between py-2.5">
-                <div>
-                  <p className="text-sm font-medium">{item.title}</p>
-                  <p className="text-xs text-muted-foreground">{item.desc}</p>
+          {section === "seguranca" && (
+            <Card>
+              <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Segurança</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="phone">Telefone (formato internacional)</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="phone"
+                      placeholder="+5511999999999"
+                      value={phone}
+                      onChange={(e) => { setPhone(e.target.value); setCodeSent(false); }}
+                      disabled={requestingCode}
+                    />
+                    <Button variant="outline" onClick={requestCode} disabled={requestingCode || !phone.trim()} className="shrink-0">
+                      {requestingCode ? "Enviando..." : "Enviar código"}
+                    </Button>
+                  </div>
+                  {user?.phone_verified && user.phone_number === phone && !codeSent && (
+                    <p className="flex items-center gap-1 text-xs text-emerald-500"><CheckCircle2 size={12} /> Telefone verificado</p>
+                  )}
                 </div>
-                <Switch checked={toggles[i]} onCheckedChange={() => handleToggle(i)} />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+
+                {codeSent && (
+                  <div className="space-y-1.5 rounded-lg border bg-muted/30 p-3">
+                    <Label htmlFor="code">Código recebido por WhatsApp</Label>
+                    <div className="flex gap-2">
+                      <Input id="code" placeholder="000000" maxLength={6} value={code} onChange={(e) => setCode(e.target.value)} />
+                      <Button onClick={verifyCode} disabled={verifyingCode || code.length !== 6} className="shrink-0">
+                        {verifyingCode ? "Verificando..." : "Verificar"}
+                      </Button>
+                    </div>
+                    <button onClick={requestCode} disabled={requestingCode} className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground">
+                      Reenviar código
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Receber notificações por WhatsApp</p>
+                    <p className="text-xs text-muted-foreground">
+                      {user?.phone_verified ? "Telefone verificado." : "Verifique seu telefone primeiro."}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={user?.whatsapp_opted_in ?? false}
+                    disabled={!user?.phone_verified}
+                    onCheckedChange={toggleWhatsappOptIn}
+                  />
+                </div>
+
+                {securityPrefs.length > 0 && (
+                  <>
+                    <Separator />
+                    {securityPrefs.map((pref) => (
+                      <div key={pref.category} className="flex items-center justify-between">
+                        <p className="text-sm font-medium">{CATEGORY_LABELS[pref.category] ?? pref.category}</p>
+                        <div className="flex items-center gap-4">
+                          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            Email
+                            <Switch checked={pref.email_enabled} onCheckedChange={(v) => updatePreference(pref.category, { email_enabled: v })} />
+                          </label>
+                          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            WhatsApp
+                            <Switch
+                              checked={pref.whatsapp_enabled}
+                              disabled={!user?.whatsapp_opted_in}
+                              onCheckedChange={(v) => updatePreference(pref.category, { whatsapp_enabled: v })}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {section === "notificacoes" && (
+            <Card>
+              <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Notificações — Pessoal</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                {personalPrefs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Carregando...</p>
+                ) : (
+                  personalPrefs.map((pref) => (
+                    <div key={pref.category} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
+                      <p className="text-sm font-medium">{CATEGORY_LABELS[pref.category] ?? pref.category}</p>
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          Email
+                          <Switch checked={pref.email_enabled} onCheckedChange={(v) => updatePreference(pref.category, { email_enabled: v })} />
+                        </label>
+                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          WhatsApp
+                          <Switch
+                            checked={pref.whatsapp_enabled}
+                            disabled={!user?.whatsapp_opted_in}
+                            onCheckedChange={(v) => updatePreference(pref.category, { whatsapp_enabled: v })}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {section === "negocio" && (
+            <Card>
+              <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Empresarial</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Preferências de notificação por lead (ex: "novo lead recebido", "IA pausada há X tempo")
+                  ainda não têm um canal próprio — hoje o que já existe de verdade é o motor de IA do
+                  atendimento e o histórico de eventos. Sem inventar toggle que não faz nada ainda.
+                </p>
+                <Button variant="outline" asChild className="w-full justify-start gap-2">
+                  <Link to="/integrations"><Plug size={14} /> Motor de IA do atendimento (Central de Integrações)</Link>
+                </Button>
+                <Button variant="outline" asChild className="w-full justify-start gap-2">
+                  <Link to="/logs"><ScrollText size={14} /> Ver logs de tudo que está acontecendo</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   );
