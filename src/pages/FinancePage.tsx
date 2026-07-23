@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { BarChart3, PieChart as PieIcon, PlusCircle, Receipt, Trash2, TrendingDown, TrendingUp, Upload, Wallet } from "lucide-react";
-import {
-  Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
-} from "recharts";
 import { toast } from "sonner";
 import { api, ApiError } from "@/lib/api";
 import { PageHeader } from "@/components/PageHeader";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
+import { CategoryDonutChart } from "@/components/charts/CategoryDonutChart";
+import { Line3DChart } from "@/components/charts/Line3DChart";
+import type { FinanceHistoryPoint } from "@/lib/line3d";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,7 @@ interface Stats {
     previous_month_by_category: Record<string, string>;
   };
   budgets: { id: number; category: string; monthly_limit: string; spent_this_month: string; percent_used: number; over_budget: boolean }[];
+  history: { month: string; income: string; expenses: string; balance: string }[];
 }
 
 // Paleta categórica validada (references/palette.md do skill dataviz), ordem fixa —
@@ -60,22 +62,6 @@ const BUDGET_CATEGORIES = Object.keys(CATEGORY_COLORS).filter((c) => c !== "Rend
 const formatBRL = (value: string | number) =>
   Number(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-function ChartTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-lg border bg-popover px-3 py-2 text-xs shadow-md">
-      {label && <p className="mb-1 font-medium text-popover-foreground">{label}</p>}
-      {payload.map((entry: any, i: number) => (
-        <div key={i} className="flex items-center gap-1.5 text-muted-foreground">
-          <span className="size-2 rounded-full" style={{ background: entry.color || entry.payload?.fill }} />
-          <span>{entry.name}:</span>
-          <span className="font-medium text-popover-foreground">{formatBRL(entry.value)}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function FinancePage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -87,10 +73,11 @@ export default function FinancePage() {
   const [budgetCategory, setBudgetCategory] = useState(BUDGET_CATEGORIES[0]);
   const [budgetLimit, setBudgetLimit] = useState("");
   const [savingBudget, setSavingBudget] = useState(false);
+  const [monthFilter, setMonthFilter] = useState<string | null>(null);
 
   const refresh = () => {
     api.get<Stats>("/api/finance/stats").then(setStats);
-    api.get<Transaction[]>("/api/finance/transactions").then((rows) => setTransactions(rows.slice(0, 6)));
+    api.get<Transaction[]>("/api/finance/transactions").then(setTransactions);
   };
 
   useEffect(refresh, []);
@@ -149,26 +136,55 @@ export default function FinancePage() {
     }
   };
 
-  const donutData = stats
-    ? Object.entries(stats.by_category).map(([category, value]) => ({ name: category, value: Number(value) }))
-    : [];
+  const availableMonths = Array.from(new Set(transactions.map((t) => t.date.slice(0, 7)))).sort((a, b) => b.localeCompare(a));
+  const monthLabel = (ym: string) => {
+    const [y, m] = ym.split("-").map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  };
+  // Sem seleção explícita do usuário ainda: abre no mês mais recente que tem
+  // transação, não no mês civil atual — senão a pizza fica vazia pra quem não
+  // lançou nada esse mês (o civil), mesmo tendo histórico dos meses anteriores.
+  const effectiveMonthFilter = monthFilter ?? availableMonths[0] ?? "all";
 
-  const comparisonData = stats
-    ? Array.from(
-        new Set([
-          ...Object.keys(stats.month_over_month.current_month_by_category),
-          ...Object.keys(stats.month_over_month.previous_month_by_category),
-        ])
-      ).map((category) => ({
-        category,
-        "Este mês": Number(stats.month_over_month.current_month_by_category[category] ?? 0),
-        "Mês anterior": Number(stats.month_over_month.previous_month_by_category[category] ?? 0),
+  const categoryTotals: Record<string, number> = {};
+  transactions
+    .filter((t) => t.type === "expense" && (effectiveMonthFilter === "all" || t.date.slice(0, 7) === effectiveMonthFilter))
+    .forEach((t) => {
+      categoryTotals[t.category] = (categoryTotals[t.category] ?? 0) + Number(t.amount);
+    });
+  const donutData = Object.entries(categoryTotals)
+    .filter(([, value]) => value > 0)
+    .map(([category, value]) => ({ name: category, value, color: categoryColor(category) }));
+
+  const historyData: FinanceHistoryPoint[] = stats
+    ? stats.history.map((h) => ({
+        month: h.month,
+        income: Number(h.income),
+        expenses: Number(h.expenses),
+        balance: Number(h.balance),
       }))
     : [];
 
+  const visibleTransactions = transactions
+    .filter((t) => effectiveMonthFilter === "all" || t.date.slice(0, 7) === effectiveMonthFilter)
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id);
+
   return (
     <div className="h-full w-full overflow-y-auto overflow-x-hidden pb-28">
-      <PageHeader title="Finanças" description="Saldo, categorias e orçamentos em um só lugar." />
+      <PageHeader
+        title="Finanças"
+        description="Saldo, categorias e orçamentos em um só lugar."
+        help={
+          <>
+            <p>Controle financeiro pessoal: lance receitas e despesas manualmente ou importe um extrato (CSV/OFX) do seu banco.</p>
+            <ul>
+              <li>A categoria de cada lançamento é sugerida automaticamente pela IA, mas pode ser ajustada.</li>
+              <li>Defina um <strong className="text-foreground">orçamento mensal</strong> por categoria — você é avisado assim que ultrapassa o limite.</li>
+            </ul>
+          </>
+        }
+      />
       <div className="mx-auto w-full max-w-5xl space-y-4 px-4 md:space-y-6 md:px-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 md:gap-6">
           <Card className="sm:col-span-1">
@@ -186,7 +202,7 @@ export default function FinancePage() {
               {stats?.month_over_month.total_change_percent != null && (
                 <div className={cn("mt-2 flex items-center gap-1 text-xs", stats.month_over_month.total_change_percent >= 0 ? "text-destructive" : "text-emerald-500")}>
                   {stats.month_over_month.total_change_percent >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
-                  {Math.abs(stats.month_over_month.total_change_percent).toFixed(1)}% vs mês anterior
+                  {Math.abs(stats.month_over_month.total_change_percent).toFixed(1)}% de gastos vs mês anterior
                 </div>
               )}
             </CardContent>
@@ -233,58 +249,56 @@ export default function FinancePage() {
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 md:gap-6">
           <Card>
-            <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Gastos por Categoria</CardTitle></CardHeader>
+            <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                Gastos por Categoria — {effectiveMonthFilter === "all" ? "todos os meses" : monthLabel(effectiveMonthFilter)}, clique numa fatia
+              </CardTitle>
+              <Select value={effectiveMonthFilter} onValueChange={setMonthFilter}>
+                <SelectTrigger size="sm" className="w-36 capitalize"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os meses</SelectItem>
+                  {availableMonths.map((ym) => (
+                    <SelectItem key={ym} value={ym} className="capitalize">{monthLabel(ym)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardHeader>
             <CardContent>
               {!stats ? (
-                <Skeleton className="mx-auto h-[220px] w-[220px] rounded-full" />
+                <Skeleton className="mx-auto h-[260px] w-full" />
               ) : donutData.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-14 text-center text-muted-foreground">
                   <PieIcon size={22} className="opacity-40" />
                   <p className="text-xs">Sem despesas registradas ainda.</p>
                 </div>
               ) : (
-                <ResponsiveContainer width="100%" height={260}>
-                  <PieChart>
-                    <Pie data={donutData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={90} paddingAngle={2} isAnimationActive animationDuration={500}>
-                      {donutData.map((entry) => (
-                        <Cell key={entry.name} fill={categoryColor(entry.name)} stroke="var(--card)" strokeWidth={2} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<ChartTooltip />} />
-                    <Legend
-                      verticalAlign="bottom"
-                      formatter={(value) => <span className="text-xs text-muted-foreground">{value}</span>}
-                      iconSize={8}
-                      iconType="circle"
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+                <CategoryDonutChart
+                  data={donutData}
+                  transactionsByCategory={(category) =>
+                    transactions.filter(
+                      (t) =>
+                        t.type === "expense" &&
+                        t.category === category &&
+                        (effectiveMonthFilter === "all" || t.date.slice(0, 7) === effectiveMonthFilter)
+                    )
+                  }
+                />
               )}
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Comparativo Mês a Mês</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Tendência (últimos 6 meses) — arraste pra girar</CardTitle></CardHeader>
             <CardContent>
               {!stats ? (
-                <Skeleton className="h-[220px] w-full" />
-              ) : comparisonData.length === 0 ? (
+                <Skeleton className="h-[260px] w-full" />
+              ) : historyData.every((h) => h.income === 0 && h.expenses === 0) ? (
                 <div className="flex flex-col items-center gap-2 py-14 text-center text-muted-foreground">
                   <BarChart3 size={22} className="opacity-40" />
                   <p className="text-xs">Sem dados suficientes ainda.</p>
                 </div>
               ) : (
-                <ResponsiveContainer width="100%" height={260}>
-                  <BarChart data={comparisonData} barCategoryGap="25%">
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                    <XAxis dataKey="category" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={{ stroke: "var(--border)" }} tickLine={false} />
-                    <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={36} />
-                    <Tooltip content={<ChartTooltip />} cursor={{ fill: "var(--muted)", opacity: 0.4 }} />
-                    <Legend formatter={(value) => <span className="text-xs text-muted-foreground">{value}</span>} iconSize={8} iconType="circle" />
-                    <Bar dataKey="Mês anterior" fill="var(--muted-foreground)" radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive animationDuration={500} />
-                    <Bar dataKey="Este mês" fill="var(--primary)" radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive animationDuration={500} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <Line3DChart history={historyData} />
               )}
             </CardContent>
           </Card>
@@ -292,33 +306,49 @@ export default function FinancePage() {
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 md:gap-6">
           <Card className="lg:col-span-2">
-            <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Últimas Transações</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              {transactions.length === 0 && (
+            <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Últimas Transações</CardTitle>
+              <Select value={effectiveMonthFilter} onValueChange={setMonthFilter}>
+                <SelectTrigger size="sm" className="w-40 capitalize"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os meses</SelectItem>
+                  {availableMonths.map((ym) => (
+                    <SelectItem key={ym} value={ym} className="capitalize">{monthLabel(ym)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardHeader>
+            <CardContent>
+              {visibleTransactions.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-6 text-center text-muted-foreground">
                   <Receipt size={22} className="opacity-40" />
-                  <p className="text-xs">Nenhuma transação ainda.</p>
+                  <p className="text-xs">Nenhuma transação nesse período.</p>
                 </div>
-              )}
-              {transactions.map((t) => (
-                <div key={t.id} className="flex items-center justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div
-                      className="flex size-8 shrink-0 items-center justify-center rounded-full"
-                      style={{ background: `color-mix(in oklch, ${categoryColor(t.category)} 18%, transparent)`, color: categoryColor(t.category) }}
-                    >
-                      {t.type === "income" ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{t.description}</p>
-                      <p className="text-xs text-muted-foreground">{t.category}</p>
-                    </div>
+              ) : (
+                <ScrollArea className="h-[340px] pr-3">
+                  <div className="space-y-3">
+                    {visibleTransactions.map((t) => (
+                      <div key={t.id} className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div
+                            className="flex size-8 shrink-0 items-center justify-center rounded-full"
+                            style={{ background: `color-mix(in oklch, ${categoryColor(t.category)} 18%, transparent)`, color: categoryColor(t.category) }}
+                          >
+                            {t.type === "income" ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">{t.description}</p>
+                            <p className="text-xs text-muted-foreground">{t.category} · {new Date(t.date).toLocaleDateString("pt-BR")}</p>
+                          </div>
+                        </div>
+                        <span className={cn("shrink-0 text-sm font-medium tabular-nums", t.type === "income" ? "text-emerald-500" : "text-foreground")}>
+                          {t.type === "income" ? "+" : "-"} {formatBRL(t.amount)}
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                  <span className={cn("shrink-0 text-sm font-medium tabular-nums", t.type === "income" ? "text-emerald-500" : "text-foreground")}>
-                    {t.type === "income" ? "+" : "-"} {formatBRL(t.amount)}
-                  </span>
-                </div>
-              ))}
+                </ScrollArea>
+              )}
             </CardContent>
           </Card>
 

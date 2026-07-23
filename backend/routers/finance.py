@@ -214,17 +214,18 @@ def _parse_csv(content: bytes) -> list[dict]:
         elif raw_amount < 0:
             # Sinal negativo explícito no valor é um sinal confiável de despesa.
             txn_type = "expense"
+        elif "receb" in description_text.lower():
+            # Extratos de Pix/transferência (Itaú, Nubank etc.) não têm coluna de tipo nem
+            # sinal, mas descrevem a direção no texto ("recebida" vs "enviada") — sem checar
+            # isso, toda transferência recebida entrava como despesa e inflava o total.
+            txn_type = "income"
         else:
-            # Sem coluna de tipo e sem sinal (a maioria dos extratos simples): assume
-            # despesa por padrão, já que é o caso mais comum numa fatura/extrato — evita
-            # inflar "renda" silenciosamente. Recomendar coluna type/tipo pra extratos com
-            # entradas e saídas misturadas sem sinal.
             txn_type = "expense"
 
         rows.append(
             {
                 "date": parsed_date,
-                "description": row[desc_col].strip(),
+                "description": description_text,
                 "amount": abs(raw_amount),
                 "type": txn_type,
             }
@@ -455,6 +456,38 @@ def get_stats(
         else Decimal("0")
     )
 
+    # Histórico dos últimos 6 meses (mais antigo primeiro) — usado pelos gráficos de tendência.
+    month_keys = []
+    hy, hm = today.year, today.month
+    for _ in range(6):
+        month_keys.append((hy, hm))
+        hm -= 1
+        if hm == 0:
+            hm = 12
+            hy -= 1
+    month_keys.reverse()
+
+    income_by_month: dict[tuple[int, int], Decimal] = {}
+    expenses_by_month: dict[tuple[int, int], Decimal] = {}
+    for t in transactions:
+        month_key = (t.date.year, t.date.month)
+        if month_key not in month_keys:
+            continue
+        if t.type == "income":
+            income_by_month[month_key] = income_by_month.get(month_key, Decimal("0")) + t.amount
+        else:
+            expenses_by_month[month_key] = expenses_by_month.get(month_key, Decimal("0")) + t.amount
+
+    history = [
+        {
+            "month": f"{y:04d}-{m:02d}",
+            "income": income_by_month.get((y, m), Decimal("0")),
+            "expenses": expenses_by_month.get((y, m), Decimal("0")),
+            "balance": income_by_month.get((y, m), Decimal("0")) - expenses_by_month.get((y, m), Decimal("0")),
+        }
+        for (y, m) in month_keys
+    ]
+
     budget_status = []
     for b in budgets:
         spent = current_month_by_category.get(b.category, Decimal("0"))
@@ -490,4 +523,5 @@ def get_stats(
             "projected_total": round(projected_total, 2),
         },
         "budgets": budget_status,
+        "history": history,
     }

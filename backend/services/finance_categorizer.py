@@ -1,8 +1,29 @@
+import re
 from functools import lru_cache
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import make_pipeline
+
+# Extratos de Pix/transferência têm boilerplate (CPF/CNPJ, "Agência: X Conta: Y", código do
+# banco) que não diz nada sobre a categoria do gasto — e pior, "conta" colide com os exemplos
+# de treino de Moradia ("conta de luz"/"conta de água"), fazendo qualquer Pix cair lá. Remove
+# esse ruído antes de classificar.
+_NOISE_PATTERNS = [
+    re.compile(r"\d{3}\.\d{3}\.\d{3}-\d{2}"),  # CPF
+    re.compile(r"\*{3}\.\d{3}\.\d{3}-\*{2}"),  # CPF mascarado
+    re.compile(r"\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}"),  # CNPJ
+    re.compile(r"ag[êe]ncia:?\s*\d+", re.IGNORECASE),
+    re.compile(r"conta:?\s*[\d-]+", re.IGNORECASE),
+    re.compile(r"\(\d{4}\)"),  # código do banco entre parênteses, ex: (0341)
+]
+
+
+def _strip_noise(description: str) -> str:
+    cleaned = description
+    for pattern in _NOISE_PATTERNS:
+        cleaned = pattern.sub(" ", cleaned)
+    return " ".join(cleaned.split())
 
 # Dados de treino do categorizador de gastos.
 TRAINING_DATA = [
@@ -50,10 +71,22 @@ def get_model():
     return model
 
 
+def _has_known_vocabulary(cleaned_descriptions: list[str]) -> list[bool]:
+    """Transferências pessoa-a-pessoa (Pix) não têm nenhuma palavra do vocabulário
+    treinado — nesse caso o modelo não tem sinal nenhum e forçar uma categoria (o
+    argmax sempre escolhe alguma) só produz um chute com cara de certeza."""
+    vectorizer = get_model().named_steps["tfidfvectorizer"]
+    matrix = vectorizer.transform(cleaned_descriptions)
+    return [matrix.getrow(i).nnz > 0 for i in range(matrix.shape[0])]
+
+
 def predict_category(description: str) -> str:
     """Prediz a categoria para uma única descrição de gasto."""
     try:
-        return get_model().predict([description.lower()])[0]
+        cleaned = _strip_noise(description.lower())
+        if not _has_known_vocabulary([cleaned])[0]:
+            return "Outros"
+        return get_model().predict([cleaned])[0]
     except Exception:
         return "Outros"
 
@@ -63,6 +96,9 @@ def categorize_transactions(descriptions: list[str]) -> list[str]:
     if not descriptions:
         return []
     try:
-        return list(get_model().predict([d.lower() for d in descriptions]))
+        cleaned = [_strip_noise(d.lower()) for d in descriptions]
+        known = _has_known_vocabulary(cleaned)
+        predictions = list(get_model().predict(cleaned))
+        return [pred if has_signal else "Outros" for pred, has_signal in zip(predictions, known)]
     except Exception:
         return ["Outros" for _ in descriptions]
