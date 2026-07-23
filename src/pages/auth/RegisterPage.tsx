@@ -64,6 +64,11 @@ export default function RegisterPage() {
           {loading ? <Loader2 size={15} className="animate-spin" /> : <>Criar conta <ArrowRight size={15} /></>}
         </Button>
         <p className="text-center text-xs text-muted-foreground">
+          Ao criar conta, você concorda com os{" "}
+          <Link to="/termos" className="text-foreground underline underline-offset-4">Termos de Uso</Link> e a{" "}
+          <Link to="/privacidade" className="text-foreground underline underline-offset-4">Política de Privacidade</Link>.
+        </p>
+        <p className="text-center text-xs text-muted-foreground">
           Já tem conta? <Link to="/login" className="text-foreground underline underline-offset-4">Entrar</Link>
         </p>
       </form>
