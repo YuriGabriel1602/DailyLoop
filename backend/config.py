@@ -88,5 +88,12 @@ class Settings:
     # (Meta valida o handshake de verificação do endpoint com esse mesmo valor).
     meta_webhook_verify_token: str = os.getenv("META_WEBHOOK_VERIFY_TOKEN", "")
 
+    # OAuth Google (Calendar/Gmail/Fit) — crie um projeto em https://console.cloud.google.com,
+    # habilite as APIs Calendar/Gmail/Fitness, configure a tela de consentimento e crie uma
+    # credencial "OAuth client ID" tipo Web application com o redirect URI abaixo cadastrado.
+    google_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    google_client_secret: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+    google_redirect_uri: str = os.getenv("GOOGLE_REDIRECT_URI", "http://127.0.0.1:8000/api/google/callback")
+
 
 settings = Settings()

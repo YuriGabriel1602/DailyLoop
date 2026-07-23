@@ -15,6 +15,8 @@ import HivePage from "./pages/HivePage";
 import CrmPage from "./pages/CrmPage";
 import InboxPage from "./pages/InboxPage";
 import IntegrationsPage from "./pages/IntegrationsPage";
+import AgendaPage from "./pages/AgendaPage";
+import PersonalIntegrationsPage from "./pages/PersonalIntegrationsPage";
 import SettingsPage from "./pages/SettingsPage";
 import AdminPage from "./pages/AdminPage";
 import { Toaster } from "@/components/ui/sonner";
@@ -60,6 +62,8 @@ function App() {
             <Route path="crm" element={<CrmPage />} />
             <Route path="inbox" element={<InboxPage />} />
             <Route path="integrations" element={<IntegrationsPage />} />
+            <Route path="agenda" element={<AgendaPage />} />
+            <Route path="integracoes-pessoais" element={<PersonalIntegrationsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route
               path="admin"

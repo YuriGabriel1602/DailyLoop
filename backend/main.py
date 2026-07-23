@@ -16,10 +16,14 @@ from database import create_db_and_tables
 from routers import (
     admin,
     auth,
+    calendar,
     chat,
     crm,
     finance,
+    fit,
     github,
+    gmail,
+    google_auth,
     inbox,
     integrations,
     meta,
@@ -79,6 +83,10 @@ app.include_router(inbox.router)
 app.include_router(integrations.router)
 app.include_router(webhooks.router)
 app.include_router(github.router)
+app.include_router(google_auth.router)
+app.include_router(calendar.router)
+app.include_router(gmail.router)
+app.include_router(fit.router)
 
 
 @app.on_event("startup")
