@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from database import Task, User, get_session
+from services import activity_log_service
 from services.auth_service import get_current_user
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
@@ -59,6 +60,7 @@ def create_task(
     session.add(db_task)
     session.commit()
     session.refresh(db_task)
+    activity_log_service.log(session, current_user.id, "pessoal", "task.created", f"Tarefa criada: {db_task.title}")
     return db_task
 
 
@@ -70,11 +72,16 @@ def update_task(
     session: Session = Depends(get_session),
 ):
     db_task = _get_owned_task(task_id, current_user, session)
-    for field, value in patch.model_dump(exclude_unset=True).items():
+    patch_data = patch.model_dump(exclude_unset=True)
+    if "completed" in patch_data:
+        patch_data["completed_at"] = datetime.utcnow() if patch_data["completed"] else None
+    for field, value in patch_data.items():
         setattr(db_task, field, value)
     session.add(db_task)
     session.commit()
     session.refresh(db_task)
+    if patch_data.get("completed"):
+        activity_log_service.log(session, current_user.id, "pessoal", "task.completed", f"Tarefa concluída: {db_task.title}")
     return db_task
 
 

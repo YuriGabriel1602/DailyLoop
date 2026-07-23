@@ -17,6 +17,7 @@ import InboxPage from "./pages/InboxPage";
 import IntegrationsPage from "./pages/IntegrationsPage";
 import AgendaPage from "./pages/AgendaPage";
 import PersonalIntegrationsPage from "./pages/PersonalIntegrationsPage";
+import LogsPage from "./pages/LogsPage";
 import SettingsPage from "./pages/SettingsPage";
 import AdminPage from "./pages/AdminPage";
 import { Toaster } from "@/components/ui/sonner";
@@ -64,6 +65,7 @@ function App() {
             <Route path="integrations" element={<IntegrationsPage />} />
             <Route path="agenda" element={<AgendaPage />} />
             <Route path="integracoes-pessoais" element={<PersonalIntegrationsPage />} />
+            <Route path="logs" element={<LogsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route
               path="admin"

@@ -53,6 +53,7 @@ class Task(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     due_at: Optional[datetime] = None
     reminded_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
 
 
 class NotificationPreference(SQLModel, table=True):
@@ -148,6 +149,19 @@ class ConversationMessage(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class ActivityLog(SQLModel, table=True):
+    """Registro cronológico de eventos dos dois mundos (Empresarial/Pessoal) — só a
+    tela de Logs (visível no lado Empresarial, como torre de controle) lê essa tabela;
+    nenhum outro fluxo depende dela."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    owner_id: int = Field(foreign_key="user.id", index=True)
+    realm: str  # "pessoal", "empresarial"
+    action: str  # ex: "task.completed", "crm.stage_changed"
+    description: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 # --- CONFIGURAÇÃO DO MOTOR ---
 
 connect_args = (
@@ -162,6 +176,7 @@ def _run_lightweight_migrations():
     quebraria com "no such column" em vez de simplesmente aparecer com o default."""
     migrations = [
         ("task", "priority", "ALTER TABLE task ADD COLUMN priority VARCHAR DEFAULT 'normal'"),
+        ("task", "completed_at", "ALTER TABLE task ADD COLUMN completed_at DATETIME"),
     ]
     with engine.connect() as conn:
         for table_name, column_name, ddl in migrations:
