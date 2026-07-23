@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { CircleDot, Clock, GitPullRequest, Link2, Sparkles, Unlink } from "lucide-react";
+import { CircleDot, Clock, GitPullRequest, Link2, Mail, Sparkles, Unlink } from "lucide-react";
 import { SiAnthropic, SiFacebook, SiGithub, SiGooglecalendar, SiInstagram, SiWhatsapp } from "react-icons/si";
 import type { IconType } from "react-icons";
 import { api, ApiError } from "@/lib/api";
@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 export type Channel =
   | "whatsapp"
@@ -169,6 +170,163 @@ export function IntegrationDetail({ integration, onChange }: { integration: Inte
             <div className="space-y-1.5">
               <Label className="text-xs">{info.tokenHint}</Label>
               <Input value={token} onChange={(e) => setToken(e.target.value)} type="password" placeholder="Cole aqui" />
+            </div>
+            <Button size="sm" onClick={connect} disabled={busy} className="w-full gap-1.5">
+              <Link2 size={13} /> Conectar
+            </Button>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+const EMAIL_PRESETS: Record<string, { imap_host: string; imap_port: number; smtp_host: string; smtp_port: number }> = {
+  gmail: { imap_host: "imap.gmail.com", imap_port: 993, smtp_host: "smtp.gmail.com", smtp_port: 587 },
+  outlook: { imap_host: "outlook.office365.com", imap_port: 993, smtp_host: "smtp.office365.com", smtp_port: 587 },
+};
+
+interface EmailAccountInfo {
+  id: number;
+  email_address: string;
+  imap_host: string;
+  imap_port: number;
+  smtp_host: string;
+  smtp_port: number;
+  status: "connected" | "disconnected";
+  last_synced_at: string | null;
+}
+
+export function EmailAccountCard() {
+  const [account, setAccount] = useState<EmailAccountInfo | null | undefined>(undefined);
+  const [emailAddress, setEmailAddress] = useState("");
+  const [password, setPassword] = useState("");
+  const [preset, setPreset] = useState<"gmail" | "outlook" | "custom">("gmail");
+  const [imapHost, setImapHost] = useState(EMAIL_PRESETS.gmail.imap_host);
+  const [imapPort, setImapPort] = useState(EMAIL_PRESETS.gmail.imap_port);
+  const [smtpHost, setSmtpHost] = useState(EMAIL_PRESETS.gmail.smtp_host);
+  const [smtpPort, setSmtpPort] = useState(EMAIL_PRESETS.gmail.smtp_port);
+  const [busy, setBusy] = useState(false);
+
+  const load = () => {
+    api.get<EmailAccountInfo | null>("/api/email-accounts").then(setAccount);
+  };
+
+  useEffect(load, []);
+
+  const applyPreset = (p: "gmail" | "outlook" | "custom") => {
+    setPreset(p);
+    if (p !== "custom") {
+      setImapHost(EMAIL_PRESETS[p].imap_host);
+      setImapPort(EMAIL_PRESETS[p].imap_port);
+      setSmtpHost(EMAIL_PRESETS[p].smtp_host);
+      setSmtpPort(EMAIL_PRESETS[p].smtp_port);
+    }
+  };
+
+  const connect = async () => {
+    if (!emailAddress.trim() || !password.trim()) {
+      toast.error("Preencha o email e a senha (ou senha de app).");
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post("/api/email-accounts", {
+        email_address: emailAddress,
+        imap_host: imapHost,
+        imap_port: imapPort,
+        smtp_host: smtpHost,
+        smtp_port: smtpPort,
+        password,
+      });
+      setPassword("");
+      toast.success("Conta de email conectada.");
+      load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível conectar essa conta de email.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const disconnect = async () => {
+    setBusy(true);
+    try {
+      await api.delete("/api/email-accounts");
+      toast.success("Email desconectado.");
+      load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (account === undefined) return <Skeleton className="h-40 w-full max-w-sm rounded-xl" />;
+
+  return (
+    <Card className="max-w-sm gap-3">
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between text-sm font-medium">
+          <span className="flex items-center gap-2"><Mail size={15} /> Email</span>
+          <Badge variant={account?.status === "connected" ? "secondary" : "outline"}>
+            {account?.status === "connected" ? "Conectado" : "Desconectado"}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {account?.status === "connected" ? (
+          <>
+            <p className="truncate text-xs text-muted-foreground">Conta: {account.email_address}</p>
+            <p className="text-[11px] text-muted-foreground">
+              Só traz os emails pra caixa unificada do Inbox — a IA ainda não responde email
+              automaticamente. Resposta manual sai por SMTP.
+            </p>
+            <Button variant="outline" size="sm" onClick={disconnect} disabled={busy} className="w-full gap-1.5">
+              <Unlink size={13} /> Desconectar
+            </Button>
+          </>
+        ) : (
+          <>
+            <div className="flex gap-1">
+              {(["gmail", "outlook", "custom"] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => applyPreset(p)}
+                  className={cn(
+                    "flex-1 rounded-md border px-2 py-1 text-[11px] capitalize",
+                    preset === p ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground"
+                  )}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Endereço de email</Label>
+              <Input value={emailAddress} onChange={(e) => setEmailAddress(e.target.value)} placeholder="voce@empresa.com" />
+            </div>
+            {preset === "custom" && (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Host IMAP</Label>
+                  <Input value={imapHost} onChange={(e) => setImapHost(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Porta IMAP</Label>
+                  <Input type="number" value={imapPort} onChange={(e) => setImapPort(Number(e.target.value))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Host SMTP</Label>
+                  <Input value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Porta SMTP</Label>
+                  <Input type="number" value={smtpPort} onChange={(e) => setSmtpPort(Number(e.target.value))} />
+                </div>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Senha (Gmail/Outlook exigem senha de app)</Label>
+              <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Cole aqui" />
             </div>
             <Button size="sm" onClick={connect} disabled={busy} className="w-full gap-1.5">
               <Link2 size={13} /> Conectar

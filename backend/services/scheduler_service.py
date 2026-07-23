@@ -12,17 +12,26 @@ from database import (
     Contact,
     Conversation,
     ConversationMessage,
+    EmailAccount,
     IntegrationCredential,
     Task,
     User,
     engine,
 )
-from services import activity_log_service, ai_service, crypto_service, meta_messaging_service, whatsapp_service
+from services import (
+    activity_log_service,
+    ai_service,
+    crypto_service,
+    email_account_service,
+    meta_messaging_service,
+    whatsapp_service,
+)
 from services.notification_service import notify
 
 logger = logging.getLogger(__name__)
 
 WATCHDOG_CHECK_MINUTES = 15
+EMAIL_POLL_MINUTES = 5
 
 
 def _run_daily_briefing():
@@ -159,6 +168,18 @@ def _run_conversation_watchdog():
             logger.info("Watchdog reativou %d conversa(s) presa(s).", reactivated)
 
 
+def _run_email_poll():
+    """Sincroniza cada conta de email conectada (Empresarial) — traz emails novos pra
+    caixa unificada do Inbox. A IA nunca responde email nesta fase (Fase 5)."""
+    with Session(engine) as session:
+        accounts = session.exec(select(EmailAccount).where(EmailAccount.status == "connected")).all()
+        total_imported = 0
+        for account in accounts:
+            total_imported += email_account_service.poll_inbox(account, session)
+        if total_imported:
+            logger.info("Email: %d mensagem(ns) nova(s) importada(s) de %d conta(s).", total_imported, len(accounts))
+
+
 _scheduler: BackgroundScheduler | None = None
 
 
@@ -182,10 +203,16 @@ def start_scheduler():
         IntervalTrigger(minutes=WATCHDOG_CHECK_MINUTES),
         id="conversation_watchdog",
     )
+    _scheduler.add_job(
+        _run_email_poll,
+        IntervalTrigger(minutes=EMAIL_POLL_MINUTES),
+        id="email_poll",
+    )
     _scheduler.start()
     logger.info(
-        "Agendador iniciado: briefing diário às %dh (UTC), lembretes a cada %d min, watchdog a cada %d min.",
+        "Agendador iniciado: briefing diário às %dh (UTC), lembretes a cada %d min, watchdog a cada %d min, email a cada %d min.",
         settings.daily_briefing_hour,
         settings.task_reminder_check_minutes,
         WATCHDOG_CHECK_MINUTES,
+        EMAIL_POLL_MINUTES,
     )

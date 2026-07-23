@@ -279,6 +279,25 @@ class ContactTag(SQLModel, table=True):
     tag_id: int = Field(foreign_key="tag.id", index=True)
 
 
+class EmailAccount(SQLModel, table=True):
+    """Uma conta de email por usuário (Gmail/Outlook/outro, via IMAP/SMTP) — só traz os
+    emails pra caixa unificada do Inbox nesta fase; a IA não responde email ainda."""
+
+    __table_args__ = (UniqueConstraint("owner_id", name="uq_emailaccount_owner"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    owner_id: int = Field(foreign_key="user.id")
+    email_address: str
+    imap_host: str
+    imap_port: int = 993
+    smtp_host: str
+    smtp_port: int = 587
+    password_encrypted: str
+    status: str = "disconnected"  # disconnected, connected
+    last_synced_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 # --- CONFIGURAÇÃO DO MOTOR ---
 
 connect_args = (

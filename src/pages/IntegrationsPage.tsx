@@ -1,29 +1,34 @@
 import { useEffect, useState } from "react";
+import { Mail } from "lucide-react";
 import { api } from "@/lib/api";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import {
-  AiEngineCard, BUSINESS_CHANNELS, CHANNEL_INFO, GithubPanel, IntegrationDetail,
+  AiEngineCard, BUSINESS_CHANNELS, CHANNEL_INFO, EmailAccountCard, GithubPanel, IntegrationDetail,
   type Channel, type Integration,
 } from "@/lib/integrationsShared";
 
+type Selection = Channel | "email";
+
 export default function IntegrationsPage() {
   const [integrations, setIntegrations] = useState<Integration[] | null>(null);
-  const [selected, setSelected] = useState<Channel | null>(null);
+  const [emailConnected, setEmailConnected] = useState(false);
+  const [selected, setSelected] = useState<Selection | null>(null);
 
   const load = () => {
     api.get<Integration[]>("/api/integrations").then((data) => {
       setIntegrations(data);
       setSelected((current) => current ?? BUSINESS_CHANNELS[0]);
     });
+    api.get<{ status: string } | null>("/api/email-accounts").then((account) => setEmailConnected(account?.status === "connected"));
   };
 
   useEffect(load, []);
 
   const byChannel = Object.fromEntries((integrations ?? []).map((i) => [i.channel, i])) as Record<Channel, Integration>;
-  const selectedIntegration = selected ? byChannel[selected] : null;
-  const connectedCount = BUSINESS_CHANNELS.filter((c) => byChannel[c]?.status === "connected").length;
+  const selectedIntegration = selected && selected !== "email" ? byChannel[selected] : null;
+  const connectedCount = BUSINESS_CHANNELS.filter((c) => byChannel[c]?.status === "connected").length + (emailConnected ? 1 : 0);
 
   return (
     <div className="flex h-full w-full flex-col overflow-y-auto pb-28">
@@ -37,6 +42,7 @@ export default function IntegrationsPage() {
               <li><strong className="text-foreground">WhatsApp/Instagram/Facebook</strong> — alimentam o Inbox e o CRM.</li>
               <li><strong className="text-foreground">GitHub</strong> — mostra seus repositórios reais (token pessoal).</li>
               <li><strong className="text-foreground">OpenAI/Anthropic</strong> — motor de IA alternativo pro Prometheus do lado Empresarial.</li>
+              <li><strong className="text-foreground">Email</strong> — traz sua caixa de entrada pro Inbox (IMAP/SMTP); resposta manual, IA ainda não responde email.</li>
             </ul>
           </>
         }
@@ -48,7 +54,7 @@ export default function IntegrationsPage() {
           </div>
         ) : (
           <>
-            <p className="text-xs text-muted-foreground">{connectedCount} conectada{connectedCount !== 1 ? "s" : ""} de {BUSINESS_CHANNELS.length}</p>
+            <p className="text-xs text-muted-foreground">{connectedCount} conectada{connectedCount !== 1 ? "s" : ""} de {BUSINESS_CHANNELS.length + 1}</p>
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
               {BUSINESS_CHANNELS.map((channel) => {
                 const info = CHANNEL_INFO[channel];
@@ -74,6 +80,22 @@ export default function IntegrationsPage() {
                   </button>
                 );
               })}
+              <button
+                onClick={() => setSelected("email")}
+                className={cn(
+                  "flex flex-col items-center gap-2 rounded-xl border bg-card p-3 text-center transition-colors hover:bg-muted/40",
+                  selected === "email" && "ring-2 ring-primary",
+                  emailConnected && "border-[var(--success)]/40"
+                )}
+              >
+                <span className="flex size-9 items-center justify-center rounded-lg bg-muted-foreground text-white">
+                  <Mail size={16} />
+                </span>
+                <span className="text-[11px] font-medium leading-tight">Email</span>
+                <span className={cn("text-[10px] font-mono", emailConnected ? "text-[var(--success)]" : "text-muted-foreground")}>
+                  {emailConnected ? "conectado" : "conectar"}
+                </span>
+              </button>
             </div>
 
             {selectedIntegration && (
@@ -82,6 +104,7 @@ export default function IntegrationsPage() {
                 {selectedIntegration.channel === "github" && selectedIntegration.status === "connected" && <GithubPanel />}
               </div>
             )}
+            {selected === "email" && <EmailAccountCard />}
 
             <AiEngineCard integrations={integrations} scope="business" />
           </>

@@ -20,6 +20,7 @@ from routers import (
     calendar,
     chat,
     crm,
+    email_accounts,
     finance,
     fit,
     github,
@@ -105,6 +106,7 @@ app.include_router(calendar.router)
 app.include_router(gmail.router)
 app.include_router(fit.router)
 app.include_router(tags.router)
+app.include_router(email_accounts.router)
 
 
 @app.on_event("startup")

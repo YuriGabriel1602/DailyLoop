@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, Inbox, Instagram, MessageCircle, Pause, Phone, Play, Send } from "lucide-react";
+import { Bot, Inbox, Instagram, Mail, MessageCircle, Pause, Phone, Play, Send } from "lucide-react";
 import { api } from "@/lib/api";
 import { useRealtimeSocket } from "@/lib/ws";
 import { PageHeader } from "@/components/PageHeader";
@@ -12,13 +12,13 @@ interface Contact {
   id: number;
   name: string;
   phone_number: string | null;
-  channel: "whatsapp" | "instagram" | "facebook";
+  channel: "whatsapp" | "instagram" | "facebook" | "email";
   external_id: string;
 }
 
 interface ConversationListItem {
   id: number;
-  channel: "whatsapp" | "instagram" | "facebook";
+  channel: "whatsapp" | "instagram" | "facebook" | "email";
   ai_enabled: boolean;
   status: string;
   last_message_at: string;
@@ -35,7 +35,7 @@ interface ConversationMessage {
   created_at: string;
 }
 
-const CHANNEL_ICONS = { whatsapp: Phone, instagram: Instagram, facebook: MessageCircle };
+const CHANNEL_ICONS = { whatsapp: Phone, instagram: Instagram, facebook: MessageCircle, email: Mail };
 
 const SENDER_LABEL: Record<ConversationMessage["sender"], string> = {
   contact: "Lead",
@@ -171,15 +171,19 @@ export default function InboxPage() {
                   {selected.contact.phone_number || selected.contact.external_id}
                 </p>
               </div>
-              <Button
-                size="sm"
-                variant={selected.ai_enabled ? "outline" : "default"}
-                onClick={toggleAi}
-                className="shrink-0 gap-1.5"
-              >
-                {selected.ai_enabled ? <Pause size={13} /> : <Play size={13} />}
-                {selected.ai_enabled ? "Pausar IA" : "Retomar IA"}
-              </Button>
+              {selected.channel === "email" ? (
+                <span className="shrink-0 text-[11px] text-muted-foreground">IA não responde email ainda</span>
+              ) : (
+                <Button
+                  size="sm"
+                  variant={selected.ai_enabled ? "outline" : "default"}
+                  onClick={toggleAi}
+                  className="shrink-0 gap-1.5"
+                >
+                  {selected.ai_enabled ? <Pause size={13} /> : <Play size={13} />}
+                  {selected.ai_enabled ? "Pausar IA" : "Retomar IA"}
+                </Button>
+              )}
             </div>
 
             <ScrollArea className="flex-1 px-4 md:px-6">

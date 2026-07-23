@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisco
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from database import Contact, Conversation, ConversationMessage, IntegrationCredential, User, engine, get_session
-from services import activity_log_service, crypto_service, meta_messaging_service, whatsapp_service
+from database import Contact, Conversation, ConversationMessage, EmailAccount, IntegrationCredential, User, engine, get_session
+from services import activity_log_service, crypto_service, email_account_service, meta_messaging_service, whatsapp_service
 from services.auth_service import decode_user_id, get_current_user
 from services.connection_manager import manager
 
@@ -41,6 +41,15 @@ def _send_to_channel(conversation: Conversation, content: str, session: Session)
 
     if conversation.channel == "whatsapp":
         return whatsapp_service.send_whatsapp_text(contact.external_id, content)
+
+    if conversation.channel == "email":
+        account = session.exec(
+            select(EmailAccount).where(EmailAccount.owner_id == conversation.owner_id, EmailAccount.status == "connected")
+        ).first()
+        if not account:
+            logger.warning("Sem conta de email conectada — resposta não enviada.")
+            return False
+        return email_account_service.send_email(account, contact.external_id, content)
 
     cred = session.exec(
         select(IntegrationCredential).where(
