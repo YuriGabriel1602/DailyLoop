@@ -55,3 +55,35 @@ def send_whatsapp_template(to: str, template_name: str, body_params: list[str]) 
     except Exception:
         logger.exception("Falha ao enviar WhatsApp '%s' para %s", template_name, to)
         return False
+
+
+def send_whatsapp_text(to: str, body: str) -> bool:
+    """Envia texto livre via WhatsApp Business Cloud API. Só funciona dentro da janela
+    de 24h de uma conversa iniciada pelo contato (regra da Meta) — para iniciar contato
+    fora dessa janela é obrigatório usar `send_whatsapp_template`."""
+    if not _is_configured():
+        logger.warning("WhatsApp não configurado — mensagem de texto para %s não foi enviada.", to)
+        return False
+
+    url = (
+        f"https://graph.facebook.com/{settings.whatsapp_api_version}/"
+        f"{settings.whatsapp_phone_number_id}/messages"
+    )
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to.lstrip("+"),
+        "type": "text",
+        "text": {"body": body},
+    }
+    headers = {"Authorization": f"Bearer {settings.whatsapp_access_token}", "Content-Type": "application/json"}
+
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            response = client.post(url, json=payload, headers=headers)
+        if response.status_code >= 400:
+            logger.error("WhatsApp recusou o texto livre para %s: %s", to, response.text)
+            return False
+        return True
+    except Exception:
+        logger.exception("Falha ao enviar texto livre WhatsApp para %s", to)
+        return False

@@ -13,7 +13,21 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from database import create_db_and_tables
-from routers import admin, auth, chat, finance, meta, notes, notifications, tasks
+from routers import (
+    admin,
+    auth,
+    chat,
+    crm,
+    finance,
+    github,
+    inbox,
+    integrations,
+    meta,
+    notes,
+    notifications,
+    tasks,
+    webhooks,
+)
 from services.scheduler_service import start_scheduler
 
 
@@ -60,6 +74,11 @@ app.include_router(chat.router)
 app.include_router(tasks.router)
 app.include_router(finance.router)
 app.include_router(notifications.router)
+app.include_router(crm.router)
+app.include_router(inbox.router)
+app.include_router(integrations.router)
+app.include_router(webhooks.router)
+app.include_router(github.router)
 
 
 @app.on_event("startup")

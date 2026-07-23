@@ -16,7 +16,9 @@ class Settings:
     )
     cors_origins: list[str] = [
         origin.strip()
-        for origin in os.getenv("CORS_ORIGINS", "http://127.0.0.1:1420").split(",")
+        for origin in os.getenv(
+            "CORS_ORIGINS", "http://127.0.0.1:1420,http://localhost:1420"
+        ).split(",")
         if origin.strip()
     ]
     log_dir: Path = BACKEND_DIR / "logs"
@@ -77,6 +79,14 @@ class Settings:
     phone_verification_resend_cooldown_seconds: int = int(
         os.getenv("PHONE_VERIFICATION_RESEND_COOLDOWN_SECONDS", "60")
     )
+
+    # Criptografia em repouso de credenciais de integração (tokens de canal).
+    # Gere com: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    credential_encryption_key: str = os.getenv("CREDENTIAL_ENCRYPTION_KEY", "")
+
+    # Token arbitrário que você escolhe e cadastra no painel de Webhooks do app da Meta
+    # (Meta valida o handshake de verificação do endpoint com esse mesmo valor).
+    meta_webhook_verify_token: str = os.getenv("META_WEBHOOK_VERIFY_TOKEN", "")
 
 
 settings = Settings()

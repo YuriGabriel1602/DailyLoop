@@ -100,6 +100,54 @@ class Message(SQLModel, table=True):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
+# --- CRM / INBOX OMNICHANNEL ---
+
+
+class Contact(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    owner_id: int = Field(foreign_key="user.id")
+    name: str
+    phone_number: Optional[str] = None
+    channel: str = Field(index=True)  # whatsapp, instagram, facebook
+    external_id: str = Field(index=True)  # id do contato na plataforma de origem
+    stage: str = "novo"  # novo, qualificado, convertido, perdido
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class IntegrationCredential(SQLModel, table=True):
+    __table_args__ = (UniqueConstraint("owner_id", "channel", name="uq_integrationcred_owner_channel"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    owner_id: int = Field(foreign_key="user.id")
+    channel: str  # whatsapp, instagram, facebook
+    external_account_id: str = ""  # WABA ID / IG business ID / Page ID
+    access_token_encrypted: str = ""
+    status: str = "disconnected"  # disconnected, connected
+    ai_default_mode: str = "24_7"  # 24_7, off
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class Conversation(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    owner_id: int = Field(foreign_key="user.id")
+    contact_id: int = Field(foreign_key="contact.id")
+    channel: str  # whatsapp, instagram, facebook
+    ai_enabled: bool = True
+    status: str = "open"  # open, closed
+    last_message_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ConversationMessage(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    conversation_id: int = Field(foreign_key="conversation.id")
+    direction: str  # inbound, outbound
+    sender: str  # contact, ai, agent
+    content: str
+    external_message_id: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 # --- CONFIGURAÇÃO DO MOTOR ---
 
 connect_args = (

@@ -17,5 +17,8 @@ ofxparse
 httpx
 apscheduler
 
+# CRM / Inbox omnichannel (WebSocket em tempo real)
+websockets
+
 # Config
 python-dotenv

@@ -53,6 +53,16 @@ def get_current_user(
     return user
 
 
+def decode_user_id(token: str) -> int | None:
+    """Versão sem Depends do decode do JWT, usada pelo handshake do WebSocket
+    (que não permite header Authorization custom no browser)."""
+    try:
+        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        return int(payload.get("sub"))
+    except (JWTError, ValueError, TypeError):
+        return None
+
+
 def require_admin(user: User = Depends(get_current_user)) -> User:
     if user.role != "admin":
         raise HTTPException(

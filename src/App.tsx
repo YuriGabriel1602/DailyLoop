@@ -12,6 +12,9 @@ import TasksPage from "./pages/TasksPage";
 import FinancePage from "./pages/FinancePage";
 import NotesPage from "./pages/NotesPage";
 import HivePage from "./pages/HivePage";
+import CrmPage from "./pages/CrmPage";
+import InboxPage from "./pages/InboxPage";
+import IntegrationsPage from "./pages/IntegrationsPage";
 import SettingsPage from "./pages/SettingsPage";
 import AdminPage from "./pages/AdminPage";
 import { Toaster } from "@/components/ui/sonner";
@@ -54,6 +57,9 @@ function App() {
             <Route path="finance" element={<FinancePage />} />
             <Route path="notes" element={<NotesPage />} />
             <Route path="hive" element={<HivePage />} />
+            <Route path="crm" element={<CrmPage />} />
+            <Route path="inbox" element={<InboxPage />} />
+            <Route path="integrations" element={<IntegrationsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route
               path="admin"

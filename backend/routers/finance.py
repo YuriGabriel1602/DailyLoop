@@ -152,8 +152,18 @@ def _parse_amount(raw: str) -> Decimal:
     return -value if negative else value
 
 
+def _decode_csv_bytes(content: bytes) -> str:
+    # Extratos de banco brasileiro exportados do Excel costumam vir em cp1252, não UTF-8.
+    for encoding in ("utf-8-sig", "cp1252"):
+        try:
+            return content.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return content.decode("utf-8-sig", errors="replace")
+
+
 def _parse_csv(content: bytes) -> list[dict]:
-    text = content.decode("utf-8-sig")
+    text = _decode_csv_bytes(content)
     reader = csv.DictReader(io.StringIO(text))
     if not reader.fieldnames:
         raise HTTPException(status_code=400, detail="CSV vazio ou sem cabeçalho")
@@ -195,6 +205,7 @@ def _parse_csv(content: bytes) -> list[dict]:
         if parsed_date is None:
             continue
 
+        description_text = row[desc_col].strip()
         raw_type = (row.get(type_col, "") or "").strip().lower() if type_col else ""
         if raw_type in ("income", "credito", "crédito", "credit"):
             txn_type = "income"
