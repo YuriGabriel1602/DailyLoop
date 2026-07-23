@@ -6,8 +6,10 @@ python-jose[cryptography]
 python-multipart
 bcrypt==3.2.0
 
-# IA (chat Prometheus)
+# IA (chat Prometheus) — motor plugável
 google-genai
+openai
+anthropic
 
 # Financeiro (categorização + import de extrato OFX)
 scikit-learn
