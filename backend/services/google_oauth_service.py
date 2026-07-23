@@ -1,5 +1,6 @@
 import json
 import logging
+import secrets
 import time
 from urllib.parse import urlencode
 
@@ -21,6 +22,34 @@ SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/fitness.activity.read",
 ]
+
+# Nonce de uso único pro parâmetro `state` do OAuth — em memória (processo único),
+# igual ao `connection_manager` de WebSocket. Evita reaproveitar o JWT de sessão
+# como `state`, que ficaria de 7 dias exposto na URL de callback (logs de acesso,
+# histórico do navegador) em vez de expirar em minutos e morrer no primeiro uso.
+_pending_states: dict[str, tuple[int, float]] = {}
+STATE_EXPIRE_SECONDS = 600
+
+
+def create_state(user_id: int) -> str:
+    now = time.time()
+    for expired_nonce in [nonce for nonce, (_, expires_at) in _pending_states.items() if expires_at < now]:
+        _pending_states.pop(expired_nonce, None)
+    nonce = secrets.token_urlsafe(32)
+    _pending_states[nonce] = (user_id, now + STATE_EXPIRE_SECONDS)
+    return nonce
+
+
+def consume_state(nonce: str) -> int | None:
+    """Consome (uso único) o nonce de `state` do OAuth Google — None se não existir,
+    já foi usado, ou expirou (10 min)."""
+    entry = _pending_states.pop(nonce, None)
+    if not entry:
+        return None
+    user_id, expires_at = entry
+    if time.time() > expires_at:
+        return None
+    return user_id
 
 
 def is_configured() -> bool:

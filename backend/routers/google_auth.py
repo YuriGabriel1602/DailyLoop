@@ -7,7 +7,7 @@ from sqlmodel import Session, select
 from config import settings
 from database import IntegrationCredential, User, get_session
 from services import activity_log_service, crypto_service, google_oauth_service
-from services.auth_service import create_access_token, decode_user_id, get_current_user
+from services.auth_service import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ def start_connect(current_user: User = Depends(get_current_user)):
             status_code=400,
             detail="Google ainda não configurado no servidor (GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET ausentes).",
         )
-    state = create_access_token(current_user.id, current_user.role)
+    state = google_oauth_service.create_state(current_user.id)
     return {"auth_url": google_oauth_service.build_auth_url(state)}
 
 
@@ -37,7 +37,7 @@ def oauth_callback(
     if error or not code:
         return RedirectResponse(f"{frontend_base}/integrations?google=erro")
 
-    user_id = decode_user_id(state)
+    user_id = google_oauth_service.consume_state(state)
     if not user_id:
         return RedirectResponse(f"{frontend_base}/integrations?google=erro")
 

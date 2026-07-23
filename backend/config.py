@@ -88,6 +88,11 @@ class Settings:
     # (Meta valida o handshake de verificação do endpoint com esse mesmo valor).
     meta_webhook_verify_token: str = os.getenv("META_WEBHOOK_VERIFY_TOKEN", "")
 
+    # App Secret do app da Meta (Configurações básicas do app no Meta for Developers) —
+    # usado pra validar a assinatura HMAC (X-Hub-Signature-256) de todo webhook recebido,
+    # provando que o payload veio mesmo da Meta e não foi forjado por terceiros.
+    meta_app_secret: str = os.getenv("META_APP_SECRET", "")
+
     # OAuth Google (Calendar/Gmail/Fit) — crie um projeto em https://console.cloud.google.com,
     # habilite as APIs Calendar/Gmail/Fitness, configure a tela de consentimento e crie uma
     # credencial "OAuth client ID" tipo Web application com o redirect URI abaixo cadastrado.

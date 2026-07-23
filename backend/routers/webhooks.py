@@ -1,3 +1,6 @@
+import hashlib
+import hmac
+import json
 import logging
 from datetime import datetime
 from typing import Optional
@@ -38,6 +41,20 @@ def verify_webhook(
     ):
         return Response(content=hub_challenge, media_type="text/plain")
     return Response(status_code=403)
+
+
+def _verify_meta_signature(raw_body: bytes, signature_header: str) -> bool:
+    """Confere o HMAC-SHA256 do corpo bruto contra o header `X-Hub-Signature-256`,
+    provando que o payload veio mesmo da Meta (e não foi forjado por quem descobrir
+    o WABA ID/Page ID, que não são segredo) — exigido pela Meta pra todo webhook."""
+    if not settings.meta_app_secret:
+        logger.warning("META_APP_SECRET não configurado — rejeitando webhook (configure-o pra habilitar o recebimento).")
+        return False
+    if not signature_header.startswith("sha256="):
+        return False
+    expected = hmac.new(settings.meta_app_secret.encode(), raw_body, hashlib.sha256).hexdigest()
+    provided = signature_header[len("sha256="):]
+    return hmac.compare_digest(expected, provided)
 
 
 def _is_group_message(msg: dict) -> bool:
@@ -183,7 +200,12 @@ async def _handle_inbound_message(
 
 @router.post("/meta")
 async def receive_webhook(request: Request, session: Session = Depends(get_session)):
-    payload = await request.json()
+    raw_body = await request.body()
+    if not _verify_meta_signature(raw_body, request.headers.get("x-hub-signature-256", "")):
+        logger.warning("Webhook Meta rejeitado: assinatura ausente ou inválida.")
+        return Response(status_code=403)
+
+    payload = json.loads(raw_body)
     channel = OBJECT_TO_CHANNEL.get(payload.get("object", ""))
     if not channel:
         return {"status": "ignored"}
