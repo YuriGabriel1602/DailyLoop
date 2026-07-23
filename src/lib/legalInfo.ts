@@ -1,7 +1,7 @@
 // Dados legais do responsável pelo DailyLoop, usados no rodapé, na Política de
 // Privacidade e nos Termos de Uso. Fonte única — mude só aqui.
 //
-// PENDENTE: cidade/UF/CEP e telefone de contato ainda não foram informados.
+// PENDENTE: CEP e telefone de contato ainda não foram informados.
 // Preencha antes de publicar o site, pois o Meta cruza o endereço declarado
 // aqui com o que consta no registro do CNPJ na verificação do Business Manager.
 export const LEGAL_INFO = {
@@ -11,8 +11,8 @@ export const LEGAL_INFO = {
   endereco: {
     logradouro: "Rua Laranjeiras",
     complemento: "",
-    cidade: "", // TODO: preencher
-    uf: "", // TODO: preencher
+    cidade: "Porto Alegre",
+    uf: "RS",
     cep: "", // TODO: preencher
   },
   telefone: "", // TODO: preencher
