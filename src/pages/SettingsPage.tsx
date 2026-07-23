@@ -57,10 +57,13 @@ const CATEGORY_LABELS: Record<string, string> = {
   task_reminder: "Lembrete de tarefas",
   daily_briefing: "Briefing diário",
   budget_alert: "Alerta financeiro",
+  inbox_new_message: "Nova mensagem no Inbox",
+  watchdog_reactivated: "Watchdog reativou uma conversa",
 };
 
 const PERSONAL_CATEGORIES = ["task_reminder", "daily_briefing", "budget_alert"];
 const SECURITY_CATEGORIES = ["password_reset"];
+const BUSINESS_CATEGORIES = ["inbox_new_message", "watchdog_reactivated"];
 
 type Section = "conta" | "aparencia" | "seguranca" | "notificacoes" | "negocio";
 
@@ -234,6 +237,7 @@ export default function SettingsPage() {
 
   const personalPrefs = preferences?.filter((p) => PERSONAL_CATEGORIES.includes(p.category)) ?? [];
   const securityPrefs = preferences?.filter((p) => SECURITY_CATEGORIES.includes(p.category)) ?? [];
+  const businessPrefs = preferences?.filter((p) => BUSINESS_CATEGORIES.includes(p.category)) ?? [];
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden">
@@ -454,6 +458,23 @@ export default function SettingsPage() {
 
           {section === "negocio" && (
             <>
+              {businessPrefs.length > 0 && (
+                <Card>
+                  <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Notificações do Inbox</CardTitle></CardHeader>
+                  <CardContent className="space-y-3">
+                    {businessPrefs.map((pref) => (
+                      <div key={pref.category} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
+                        <p className="text-sm font-medium">{CATEGORY_LABELS[pref.category] ?? pref.category}</p>
+                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          Email
+                          <Switch checked={pref.email_enabled} onCheckedChange={(v) => updatePreference(pref.category, { email_enabled: v })} />
+                        </label>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
               {!aiSettings ? (
                 <p className="text-sm text-muted-foreground">Carregando...</p>
               ) : (

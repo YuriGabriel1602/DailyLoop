@@ -148,6 +148,11 @@ def _run_conversation_watchdog():
                 session, conversation.owner_id, "empresarial", "inbox.watchdog_reactivated",
                 f"Watchdog reativou a IA numa conversa parada há {inactivity_minutes}+ min",
             )
+            notify(
+                session, owner, "watchdog_reactivated",
+                email_subject="Watchdog reativou uma conversa — DailyLoop",
+                email_body=f"Uma conversa estava parada há {inactivity_minutes}+ minutos sem resposta — o watchdog reativou a IA e já respondeu.",
+            )
             reactivated += 1
 
         if reactivated:

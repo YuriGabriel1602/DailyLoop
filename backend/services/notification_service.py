@@ -7,7 +7,10 @@ from database import NotificationPreference, User
 from services.email_service import send_email
 from services.whatsapp_service import send_whatsapp_template
 
-CATEGORIES = ["password_reset", "task_reminder", "daily_briefing", "budget_alert"]
+CATEGORIES = [
+    "password_reset", "task_reminder", "daily_briefing", "budget_alert",
+    "inbox_new_message", "watchdog_reactivated",
+]
 
 _TEMPLATE_BY_CATEGORY = {
     "password_reset": lambda: settings.whatsapp_template_password_reset,

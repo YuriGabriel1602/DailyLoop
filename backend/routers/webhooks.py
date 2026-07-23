@@ -9,6 +9,7 @@ from config import settings
 from database import BusinessAISettings, Contact, Conversation, ConversationMessage, IntegrationCredential, User, get_session
 from services import activity_log_service, ai_service, crypto_service, meta_messaging_service, whatsapp_service
 from services.connection_manager import manager
+from services.notification_service import notify
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +137,13 @@ async def _handle_inbound_message(
         session, owner_id, "empresarial", "inbox.message_received",
         f"{contact.name} ({channel}) mandou uma mensagem",
     )
+    owner_for_notify = session.get(User, owner_id)
+    if owner_for_notify:
+        notify(
+            session, owner_for_notify, "inbox_new_message",
+            email_subject="Nova mensagem no Inbox — DailyLoop",
+            email_body=f"{contact.name} ({channel}) mandou: \"{text[:200]}\"",
+        )
 
     if not conversation.ai_enabled:
         return
