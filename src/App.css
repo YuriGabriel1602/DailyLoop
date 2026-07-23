@@ -29,6 +29,8 @@
   --chart-3: oklch(0.65 0.19 40);
   --chart-4: oklch(0.6 0.2 320);
   --chart-5: oklch(0.6 0.18 25);
+  --biz: oklch(0.6 0.14 75); /* acento do modo Empresarial (light) — provisório */
+  --biz-foreground: oklch(0.985 0 0);
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
@@ -71,6 +73,8 @@ body {
   --color-muted: var(--muted);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary: var(--secondary);
+  --color-biz-foreground: var(--biz-foreground);
+  --color-biz: var(--biz);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
   --color-popover-foreground: var(--popover-foreground);
@@ -88,38 +92,59 @@ body {
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Paleta oficial do dark theme (spec Dashboard v2, seção 2).
+   Hierarquia por camadas de profundidade (base → card → elemento interno), não por sombra. */
 .dark {
-  --background: oklch(0.13 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.19 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.19 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.62 0.19 262);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.24 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.24 0 0);
-  --muted-foreground: oklch(0.65 0 0);
-  --accent: oklch(0.26 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.65 0.2 25);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.62 0.19 262);
-  --chart-1: oklch(0.62 0.19 262);
-  --chart-2: oklch(0.7 0.17 165);
-  --chart-3: oklch(0.72 0.17 70);
+  --background: #0a0d14; /* bg-base */
+  --foreground: #e8eaf0; /* text-primary */
+  --card: #111623; /* bg-card */
+  --card-foreground: #e8eaf0;
+  --popover: #111623;
+  --popover-foreground: #e8eaf0;
+  --primary: #5b8ef7; /* accent: azul do sistema (ações, Prometheus) */
+  --primary-foreground: #0a0d14;
+  --secondary: #1c2740; /* bg-elevated */
+  --secondary-foreground: #e8eaf0;
+  --muted: #1c2740;
+  --muted-foreground: #8b93a7; /* text-secondary */
+  --accent: #1c2740;
+  --accent-foreground: #e8eaf0;
+  --destructive: #f0997b; /* warning: alertas de gasto/tendência negativa */
+  --border: #1e2430; /* border-subtle */
+  --input: #232b3d; /* border-default */
+  --ring: #5b8ef7;
+  --chart-1: #5b8ef7;
+  --chart-2: #34c98e;
+  --chart-3: #f0997b;
   --chart-4: oklch(0.68 0.19 320);
   --chart-5: oklch(0.65 0.2 25);
-  --sidebar: oklch(0.11 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.62 0.19 262);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.24 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.62 0.19 262);
+  --sidebar: #0a0d14;
+  --sidebar-foreground: #e8eaf0;
+  --sidebar-primary: #5b8ef7;
+  --sidebar-primary-foreground: #0a0d14;
+  --sidebar-accent: #1c2740;
+  --sidebar-accent-foreground: #e8eaf0;
+  --sidebar-border: #1e2430;
+  --sidebar-ring: #5b8ef7;
+  --success: #34c98e;
+  --warning: #f0997b;
+  --border-strong: #3a4a70;
+  --text-dim: #5a6275; /* text-muted da spec (hints, metadados) */
+  --accent-surface: #14203a; /* fundo de cards de destaque do Prometheus */
+  --accent-border: #24365c;
+  --biz: #e0a94f; /* acento do modo Empresarial — provisório até definirmos identidade visual */
+  --biz-foreground: #1a1200;
+}
+
+/* Modo Empresarial: sobrescreve o acento do sistema (mesmas variáveis que os componentes
+   shadcn já consomem) sem duplicar nenhum componente — só troca o token. */
+.mode-business {
+  --primary: var(--biz);
+  --primary-foreground: var(--biz-foreground);
+  --ring: var(--biz);
+  --sidebar-primary: var(--biz);
+  --sidebar-primary-foreground: var(--biz-foreground);
+  --sidebar-ring: var(--biz);
 }
 
 @layer base {

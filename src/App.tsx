@@ -15,6 +15,11 @@ import HivePage from "./pages/HivePage";
 import CrmPage from "./pages/CrmPage";
 import InboxPage from "./pages/InboxPage";
 import IntegrationsPage from "./pages/IntegrationsPage";
+import AreasPage from "./pages/AreasPage";
+import PeoplePage from "./pages/PeoplePage";
+import JournalPage from "./pages/JournalPage";
+import RitualsPage from "./pages/RitualsPage";
+import GoalsPage from "./pages/GoalsPage";
 import AgendaPage from "./pages/AgendaPage";
 import PersonalIntegrationsPage from "./pages/PersonalIntegrationsPage";
 import LogsPage from "./pages/LogsPage";
@@ -63,6 +68,11 @@ function App() {
             <Route path="crm" element={<CrmPage />} />
             <Route path="inbox" element={<InboxPage />} />
             <Route path="integrations" element={<IntegrationsPage />} />
+            <Route path="areas" element={<AreasPage />} />
+            <Route path="pessoas" element={<PeoplePage />} />
+            <Route path="diario" element={<JournalPage />} />
+            <Route path="rituais" element={<RitualsPage />} />
+            <Route path="bussola" element={<GoalsPage />} />
             <Route path="agenda" element={<AgendaPage />} />
             <Route path="integracoes-pessoais" element={<PersonalIntegrationsPage />} />
             <Route path="logs" element={<LogsPage />} />

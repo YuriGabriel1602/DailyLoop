@@ -34,6 +34,9 @@ def _user_public(user: User) -> dict:
         "phone_number": user.phone_number,
         "phone_verified": user.phone_verified,
         "whatsapp_opted_in": user.whatsapp_opted_in,
+        "dashboard_layout": user.dashboard_layout,
+        "ai_provider_personal": user.ai_provider_personal,
+        "ai_provider_business": user.ai_provider_business,
     }
 
 
@@ -165,6 +168,9 @@ def me(current_user: User = Depends(get_current_user)):
 class ProfileUpdate(BaseModel):
     phone_number: Optional[str] = None
     whatsapp_opted_in: Optional[bool] = None
+    dashboard_layout: Optional[str] = None
+    ai_provider_personal: Optional[str] = None
+    ai_provider_business: Optional[str] = None
 
 
 @router.patch("/me")
@@ -183,6 +189,16 @@ def update_me(
         if payload.whatsapp_opted_in and not current_user.phone_verified:
             raise HTTPException(status_code=400, detail="Verifique seu telefone antes de ativar o WhatsApp")
         current_user.whatsapp_opted_in = payload.whatsapp_opted_in
+    if payload.dashboard_layout is not None:
+        current_user.dashboard_layout = payload.dashboard_layout
+    if payload.ai_provider_personal is not None:
+        if payload.ai_provider_personal not in ("gemini", "openai", "anthropic"):
+            raise HTTPException(status_code=400, detail="Provedor inválido")
+        current_user.ai_provider_personal = payload.ai_provider_personal
+    if payload.ai_provider_business is not None:
+        if payload.ai_provider_business not in ("gemini", "openai", "anthropic"):
+            raise HTTPException(status_code=400, detail="Provedor inválido")
+        current_user.ai_provider_business = payload.ai_provider_business
     session.add(current_user)
     session.commit()
     session.refresh(current_user)

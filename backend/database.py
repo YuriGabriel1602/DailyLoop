@@ -22,6 +22,9 @@ class User(SQLModel, table=True):
     phone_number: Optional[str] = None  # E.164, ex: +5511999999999
     phone_verified: bool = False
     whatsapp_opted_in: bool = False
+    dashboard_layout: Optional[str] = None  # JSON: ordem dos widgets do Painel, por usuário
+    ai_provider_personal: str = "gemini"  # gemini, openai, anthropic — usado por ask_prometheus
+    ai_provider_business: str = "gemini"  # usado por answer_conversation (Inbox)
 
 
 class PasswordResetToken(SQLModel, table=True):
@@ -98,6 +101,7 @@ class Message(SQLModel, table=True):
     owner_id: int = Field(foreign_key="user.id")
     role: str  # user, assistant
     content: str
+    realm: str = "pessoal"  # pessoal, empresarial — históricos de chat do Prometheus nunca se misturam
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -149,6 +153,56 @@ class ConversationMessage(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+# --- ECOSSISTEMA PESSOAL ---
+
+
+class PersonalContact(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    owner_id: int = Field(foreign_key="user.id")
+    name: str
+    relationship: str = "amigo"  # familia, amigo, mentor, outro
+    last_contact_at: Optional[datetime] = None
+    important_date: Optional[date_type] = None  # aniversário etc.
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class JournalEntry(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    owner_id: int = Field(foreign_key="user.id")
+    content: str
+    ai_reflection: Optional[str] = None
+    mood_score: Optional[int] = None  # 1-5
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class Ritual(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    owner_id: int = Field(foreign_key="user.id")
+    name: str
+    steps: str = "[]"  # JSON: lista de strings
+    area: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class RitualLog(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    ritual_id: int = Field(foreign_key="ritual.id")
+    date: date_type = Field(default_factory=date_type.today)
+    completed_steps: str = "[]"  # JSON: índices dos passos concluídos nesse dia
+
+
+class Goal(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    owner_id: int = Field(foreign_key="user.id")
+    title: str
+    target_date: Optional[date_type] = None
+    progress_percent: int = 0
+    area: Optional[str] = None
+    note: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class ActivityLog(SQLModel, table=True):
     """Registro cronológico de eventos dos dois mundos (Empresarial/Pessoal) — só a
     tela de Logs (visível no lado Empresarial, como torre de controle) lê essa tabela;
@@ -177,6 +231,10 @@ def _run_lightweight_migrations():
     migrations = [
         ("task", "priority", "ALTER TABLE task ADD COLUMN priority VARCHAR DEFAULT 'normal'"),
         ("task", "completed_at", "ALTER TABLE task ADD COLUMN completed_at DATETIME"),
+        ("user", "dashboard_layout", "ALTER TABLE user ADD COLUMN dashboard_layout VARCHAR"),
+        ("user", "ai_provider_personal", "ALTER TABLE user ADD COLUMN ai_provider_personal VARCHAR DEFAULT 'gemini'"),
+        ("user", "ai_provider_business", "ALTER TABLE user ADD COLUMN ai_provider_business VARCHAR DEFAULT 'gemini'"),
+        ("message", "realm", "ALTER TABLE message ADD COLUMN realm VARCHAR DEFAULT 'pessoal'"),
     ]
     with engine.connect() as conn:
         for table_name, column_name, ddl in migrations:

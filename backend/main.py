@@ -23,13 +23,18 @@ from routers import (
     fit,
     github,
     gmail,
+    goals,
     google_auth,
     inbox,
+    insights,
     integrations,
+    journal,
     logs,
     meta,
     notes,
     notifications,
+    people,
+    rituals,
     tasks,
     webhooks,
 )
@@ -79,11 +84,16 @@ app.include_router(chat.router)
 app.include_router(tasks.router)
 app.include_router(finance.router)
 app.include_router(notifications.router)
+app.include_router(insights.router)
 app.include_router(crm.router)
 app.include_router(inbox.router)
 app.include_router(integrations.router)
 app.include_router(webhooks.router)
 app.include_router(github.router)
+app.include_router(people.router)
+app.include_router(journal.router)
+app.include_router(rituals.router)
+app.include_router(goals.router)
 app.include_router(logs.router)
 app.include_router(google_auth.router)
 app.include_router(calendar.router)

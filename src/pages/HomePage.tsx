@@ -1,308 +1,249 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import {
-  AlertCircle, AlertTriangle, ArrowRight, Car, CheckCircle2, Droplets, ListTodo, MapPin, Pause, Play,
-  RefreshCw, Send, Server, Star, Sun, Terminal, ThermometerSun, Wallet, Wind,
-} from "lucide-react";
-import { api, ApiError } from "@/lib/api";
-import { useStore } from "@/store/useStore";
-import { useBackendStatus, useInterval, useTimeFormat } from "@/components/ui/primitives";
+import { Link } from "react-router-dom";
+import { BookHeart, CheckCircle2, Send, Sparkle } from "lucide-react";
+import { api } from "@/lib/api";
+import { useStore, type HomeViewStyle } from "@/store/useStore";
 import { PageHeader } from "@/components/PageHeader";
-import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
-interface TaskLite {
-  id: number;
-  completed: boolean;
-  due_at: string | null;
-}
+const VIEW_LABELS: Record<HomeViewStyle, string> = {
+  carta: "Carta do Dia",
+  terminal: "Terminal",
+  heatmap: "Mapa de Calor",
+  capsula: "Cápsula do Tempo",
+};
 
-interface FinanceLite {
-  balance: string;
-  budgets: { category: string; over_budget: boolean }[];
-}
-
-const formatBRL = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-
-function TasksSummaryCard({ tasks, onClick }: { tasks: TaskLite[] | null; onClick: () => void }) {
-  if (!tasks) {
-    return (
-      <Card className="gap-3">
-        <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Tarefas</CardTitle></CardHeader>
-        <CardContent><Skeleton className="h-8 w-24" /></CardContent>
-      </Card>
-    );
-  }
-
-  const now = new Date();
-  const pending = tasks.filter((t) => !t.completed);
-  const overdue = pending.filter((t) => t.due_at && new Date(t.due_at) < now);
-
+function ViewSwitcher() {
+  const homeViewStyle = useStore((s) => s.homeViewStyle);
+  const setHomeViewStyle = useStore((s) => s.setHomeViewStyle);
   return (
-    <Card onClick={onClick} className="cursor-pointer gap-3 transition-shadow hover:shadow-md">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-          <span className="flex items-center gap-1.5"><ListTodo size={14} /> Tarefas</span>
-          {overdue.length > 0 && (
-            <span className="flex items-center gap-1 text-destructive"><AlertTriangle size={11} /> {overdue.length} atrasada{overdue.length > 1 ? "s" : ""}</span>
+    <div className="flex flex-wrap gap-1.5">
+      {(Object.keys(VIEW_LABELS) as HomeViewStyle[]).map((style) => (
+        <button
+          key={style}
+          onClick={() => setHomeViewStyle(style)}
+          className={cn(
+            "rounded-full border px-3 py-1 font-mono text-[11px] transition-colors",
+            homeViewStyle === style ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"
           )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-semibold tabular-nums">{pending.length}</div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {pending.length === 0 ? "Tudo em dia. Nenhuma pendência." : `pendente${pending.length > 1 ? "s" : ""} em aberto`}
-        </p>
-      </CardContent>
-    </Card>
+        >
+          {VIEW_LABELS[style]}
+        </button>
+      ))}
+    </div>
   );
 }
 
-function FinanceSummaryCard({ finance, onClick }: { finance: FinanceLite | null; onClick: () => void }) {
-  if (!finance) {
-    return (
-      <Card className="gap-3">
-        <CardHeader><CardTitle className="text-xs font-medium text-muted-foreground">Finanças</CardTitle></CardHeader>
-        <CardContent><Skeleton className="h-8 w-28" /></CardContent>
-      </Card>
-    );
-  }
+function QuickCapture() {
+  const [value, setValue] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const overBudget = finance.budgets.filter((b) => b.over_budget);
+  const send = async () => {
+    if (!value.trim()) return;
+    setSaving(true);
+    try {
+      await api.post("/api/tasks", { title: value });
+      setValue("");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <Card onClick={onClick} className="cursor-pointer gap-3 transition-shadow hover:shadow-md">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-          <span className="flex items-center gap-1.5"><Wallet size={14} /> Saldo</span>
-          {overBudget.length > 0 && (
-            <span className="flex items-center gap-1 text-destructive"><AlertTriangle size={11} /> orçamento estourado</span>
-          )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-semibold tabular-nums"><AnimatedNumber value={Number(finance.balance)} formatter={formatBRL} /></div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {overBudget.length === 0 ? "Dentro do planejado este mês." : `${overBudget.length} categoria${overBudget.length > 1 ? "s" : ""} acima do limite`}
-        </p>
-      </CardContent>
-    </Card>
+    <div className="relative">
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && send()}
+        placeholder="Descarregue uma ideia — vira tarefa..."
+        className="w-full rounded-xl border border-input bg-background py-2.5 pr-11 pl-4 text-sm outline-none focus:border-ring"
+      />
+      <Button size="icon-sm" onClick={send} disabled={saving || !value.trim()} className="absolute top-1/2 right-1.5 -translate-y-1/2">
+        <Send size={14} />
+      </Button>
+    </div>
   );
 }
 
-function UberCard() {
-  const [expanded, setExpanded] = useState(false);
-  return (
-    <Card className="cursor-pointer gap-3" onClick={() => setExpanded((v) => !v)}>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-          <span className="flex items-center gap-1.5"><Car size={14} /> Uber</span>
-          <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground">Prévia</Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="text-xl font-semibold">4 min</div>
-        <p className="mt-1 text-xs text-muted-foreground">Viagem para o Escritório</p>
-        {expanded && (
-          <div className="mt-4 flex items-center gap-3 rounded-lg border bg-muted/40 p-3">
-            <div className="flex size-9 items-center justify-center rounded-full bg-muted text-xs font-semibold">JS</div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between text-xs font-medium">
-                João Silva <span className="flex items-center gap-0.5 text-amber-500"><Star size={10} fill="currentColor" /> 4.9</span>
-              </div>
-              <p className="text-xs text-muted-foreground">Tesla Model 3 • DXS-9090</p>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
+function CartaDoDiaView() {
+  const [text, setText] = useState<string | null>(null);
 
-function WeatherCard() {
+  useEffect(() => {
+    api.get<{ text: string }>("/api/insights/daily-briefing").then((r) => setText(r.text));
+  }, []);
+
+  const today = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
+
   return (
-    <Card className="gap-3">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-          <span className="flex items-center gap-1.5"><ThermometerSun size={14} /> Clima Hoje</span>
-          <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground">Prévia</Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-semibold">24°</div>
-        <p className="mt-1 text-xs text-muted-foreground">Parcialmente nublado</p>
-        <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><MapPin size={11} /> Porto Alegre, BR</p>
-        <div className="mt-3 flex gap-4 border-t pt-3 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1"><Droplets size={11} /> 62%</span>
-          <span className="flex items-center gap-1"><Wind size={11} /> 14km/h</span>
-          <span className="flex items-center gap-1"><Sun size={11} /> UV 6</span>
+    <div className="rounded-2xl border bg-card p-6 md:p-8">
+      <p className="font-mono text-xs text-muted-foreground uppercase">{today}</p>
+      {!text ? (
+        <div className="mt-4 space-y-2">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-11/12" />
+          <Skeleton className="h-4 w-4/5" />
         </div>
-      </CardContent>
-    </Card>
+      ) : (
+        <p className="mt-4 max-w-2xl text-[15px] leading-relaxed">{text}</p>
+      )}
+      <div className="mt-6 flex flex-wrap gap-2">
+        <Button asChild size="sm"><Link to="/tasks"><CheckCircle2 size={13} /> Ver tarefas</Link></Button>
+        <Button asChild size="sm" variant="outline"><Link to="/diario"><BookHeart size={13} /> Escrever no diário</Link></Button>
+      </div>
+    </div>
+  );
+}
+
+interface DashboardInsights {
+  day_progress: { completed: number; total: number };
+  streak: { current: number };
+}
+
+interface AreaSummary {
+  area: string;
+  tasks_pending: number;
+  tasks_done: number;
+  contacts_cold?: number;
+}
+
+function TerminalView() {
+  const [lines, setLines] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    Promise.all([
+      api.get<DashboardInsights>("/api/insights/dashboard"),
+      api.get<AreaSummary[]>("/api/insights/life-areas"),
+    ]).then(([dash, areas]) => {
+      const now = new Date();
+      const ts = now.toTimeString().slice(0, 8);
+      const out: string[] = [
+        `[${ts}] boot daily_loop --user=session`,
+        `[${ts}] ✓ tasks.pending = ${areas.reduce((s, a) => s + a.tasks_pending, 0)}`,
+        `[${ts}] ✓ day_progress = ${dash.day_progress.completed}/${dash.day_progress.total}`,
+        `[${ts}] ✓ streak.current = ${dash.streak.current}d`,
+      ];
+      areas.forEach((a) => {
+        if (a.contacts_cold) out.push(`[${ts}] ⚠ area(${a.area}).contacts_cold = ${a.contacts_cold}`);
+        else out.push(`[${ts}] ✓ area(${a.area}) ok`);
+      });
+      setLines(out);
+    });
+  }, []);
+
+  return (
+    <div className="rounded-2xl bg-[#0d1117] p-5 font-mono text-[13px] leading-[1.9] text-[#7ee787] md:p-6">
+      {!lines ? (
+        <Skeleton className="h-40 w-full bg-white/5" />
+      ) : (
+        <>
+          {lines.map((line, i) => (
+            <div key={i} className={line.includes("⚠") ? "text-[#f0997b]" : ""}>{line}</div>
+          ))}
+          <div>
+            <span className="text-[#7ee787]">user@dailyloop</span>
+            <span className="text-[#8b949e]">:~$ </span>
+            <span className="inline-block h-3.5 w-1.5 animate-pulse bg-[#7ee787] align-text-bottom" />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function HeatmapView() {
+  const [days, setDays] = useState<{ date: string; count: number }[] | null>(null);
+
+  useEffect(() => {
+    api.get<{ date: string; count: number }[]>("/api/insights/activity-heatmap").then(setDays);
+  }, []);
+
+  const colorFor = (count: number) => {
+    if (count === 0) return "var(--border)";
+    if (count === 1) return "color-mix(in oklch, var(--primary) 35%, transparent)";
+    if (count === 2) return "color-mix(in oklch, var(--primary) 65%, transparent)";
+    return "var(--primary)";
+  };
+
+  return (
+    <div className="rounded-2xl border bg-card p-5 md:p-6">
+      <p className="mb-3 text-sm font-medium">Intensidade dos últimos 6 meses</p>
+      {!days ? (
+        <Skeleton className="h-32 w-full" />
+      ) : (
+        <div className="grid gap-[3px]" style={{ gridTemplateColumns: "repeat(26, minmax(0, 1fr))" }}>
+          {days.map((d) => (
+            <div
+              key={d.date}
+              title={`${d.date}: ${d.count} atividade(s)`}
+              className="aspect-square rounded-[2px]"
+              style={{ background: colorFor(d.count) }}
+            />
+          ))}
+        </div>
+      )}
+      <p className="mt-3 text-xs text-muted-foreground">Tarefas concluídas + entradas de diário + rituais marcados, por dia.</p>
+    </div>
+  );
+}
+
+function CapsulaView() {
+  const [capsule, setCapsule] = useState<{ content: string; days_ago: number; mood_score: number | null } | null | undefined>(undefined);
+
+  useEffect(() => {
+    api.get<typeof capsule>("/api/insights/time-capsule").then(setCapsule);
+  }, []);
+
+  if (capsule === undefined) return <Skeleton className="mx-auto h-40 w-full max-w-md" />;
+
+  return (
+    <div className="mx-auto max-w-md rounded-2xl border p-6 text-center">
+      <Sparkle size={18} className="mx-auto mb-2 text-primary" />
+      {capsule ? (
+        <>
+          <p className="font-mono text-xs text-primary uppercase">há {capsule.days_ago} dia{capsule.days_ago !== 1 ? "s" : ""}</p>
+          <p className="mt-2 text-[15px] leading-relaxed font-medium">"{capsule.content}"</p>
+        </>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Ainda sem memórias suficientes — escreva no <Link to="/diario" className="text-primary underline underline-offset-2">Diário</Link> pra
+          a Cápsula do Tempo ter o que te mostrar depois.
+        </p>
+      )}
+    </div>
   );
 }
 
 export default function HomePage() {
-  const navigate = useNavigate();
   const user = useStore((s) => s.user);
-  const isBackendOnline = useBackendStatus();
-  const [clock, setClock] = useState(new Date());
-  useInterval(() => setClock(new Date()), 1000);
-
-  const [tasks, setTasks] = useState<TaskLite[] | null>(null);
-  const [finance, setFinance] = useState<FinanceLite | null>(null);
-
-  useEffect(() => {
-    api.get<TaskLite[]>("/api/tasks").then(setTasks).catch(() => setTasks([]));
-    api.get<FinanceLite>("/api/finance/stats").then(setFinance).catch(() => setFinance(null));
-  }, []);
-
-  const [mission, setMission] = useState("");
-  const [localInput, setLocalInput] = useState("");
-  const [timeLeft, setTimeLeft] = useState(45 * 60);
-  const [isTimerRunning, setIsTimerRunning] = useState(false);
-
-  const [quickNote, setQuickNote] = useState("");
-  const [noteStatus, setNoteStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
-
-  useInterval(() => {
-    if (timeLeft > 0) setTimeLeft(timeLeft - 1);
-    else setIsTimerRunning(false);
-  }, isTimerRunning ? 1000 : null);
-
-  const handleSetMission = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (localInput.trim()) {
-      setMission(localInput);
-      setIsTimerRunning(true);
-    }
-  };
-
-  const handleSaveNote = async () => {
-    if (!quickNote.trim() || !isBackendOnline) return;
-    setNoteStatus("saving");
-    try {
-      await api.post("/api/notes", { content: quickNote });
-      setQuickNote("");
-      setNoteStatus("success");
-    } catch (err) {
-      if (!(err instanceof ApiError && err.status === 401)) setNoteStatus("error");
-    } finally {
-      setTimeout(() => setNoteStatus("idle"), 2500);
-    }
-  };
+  const homeViewStyle = useStore((s) => s.homeViewStyle);
 
   return (
     <div className="h-full w-full overflow-y-auto overflow-x-hidden pb-28">
       <PageHeader
         title="Painel"
-        description={`Olá, ${user?.username ?? "Arquiteto"}. Aqui está o seu dia.`}
-        actions={
+        description={`Olá, ${user?.username ?? "Arquiteto"}.`}
+        help={
           <>
-            <span className="hidden font-mono text-xs tabular-nums text-muted-foreground sm:inline">
-              {clock.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-            </span>
-            <Badge variant={isBackendOnline ? "secondary" : "destructive"} className="gap-1.5">
-              <Server size={11} /> {isBackendOnline ? "Online" : "Offline"}
-            </Badge>
+            <p>A tela inicial do seu lado Pessoal. Escolha entre 4 formatos de visualização, no botão logo abaixo do título:</p>
+            <ul>
+              <li><strong className="text-foreground">Carta do Dia</strong> — um resumo narrativo escrito pela IA a partir das suas tarefas, rituais e metas reais.</li>
+              <li><strong className="text-foreground">Terminal</strong> — os mesmos dados em formato de log técnico.</li>
+              <li><strong className="text-foreground">Mapa de Calor</strong> — sua atividade dos últimos 6 meses (tarefas, diário, rituais).</li>
+              <li><strong className="text-foreground">Cápsula do Tempo</strong> — uma entrada antiga do Diário, relembrada aleatoriamente.</li>
+            </ul>
+            <p>A Captura Rápida logo abaixo vira tarefa assim que você aperta Enter.</p>
           </>
         }
       />
-
-      <div className="mx-auto w-full max-w-6xl space-y-4 p-4 md:space-y-6 md:p-6">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-4">
-          <Card className="flex min-h-[240px] flex-col justify-center p-6 md:col-span-2 md:p-10">
-            {!mission ? (
-              <div className="space-y-5">
-                <Badge variant="secondary">Sistema pronto</Badge>
-                <h1 className="text-2xl leading-tight font-semibold tracking-tight md:text-3xl">
-                  Qual o seu próximo objetivo?
-                </h1>
-                <form onSubmit={handleSetMission} className="relative max-w-lg">
-                  <input
-                    autoFocus
-                    type="text"
-                    value={localInput}
-                    onChange={(e) => setLocalInput(e.target.value)}
-                    placeholder="Descreva a tarefa em foco..."
-                    className="w-full rounded-xl border border-input bg-background py-3 pr-14 pl-4 text-sm outline-none focus:border-ring"
-                  />
-                  <Button type="submit" size="icon-sm" className="absolute top-1/2 right-1.5 -translate-y-1/2">
-                    <ArrowRight size={16} />
-                  </Button>
-                </form>
-              </div>
-            ) : (
-              <div className="space-y-5">
-                <div className="flex items-center gap-3">
-                  <Badge className="animate-pulse">Em execução</Badge>
-                  <button
-                    onClick={() => { setMission(""); setIsTimerRunning(false); setTimeLeft(45 * 60); }}
-                    className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-                <h1 className="max-w-xl text-2xl leading-tight font-semibold break-words md:text-3xl">{mission}</h1>
-                <div className="flex items-center gap-4">
-                  <div className="font-mono text-5xl font-light tabular-nums">{useTimeFormat(timeLeft)}</div>
-                  <Button size="icon-lg" onClick={() => setIsTimerRunning((v) => !v)}>
-                    {isTimerRunning ? <Pause size={20} /> : <Play size={20} />}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </Card>
-
-          <Card className="relative flex flex-col gap-3">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-                <span className="flex items-center gap-1.5"><Terminal size={14} /> Captura Rápida</span>
-                {!isBackendOnline && <span className="flex items-center gap-1 text-xs text-destructive"><AlertCircle size={11} /> Offline</span>}
-                {noteStatus === "saving" && <span className="text-xs text-muted-foreground">Salvando...</span>}
-                {noteStatus === "success" && <span className="flex items-center gap-1 text-xs text-emerald-500"><CheckCircle2 size={11} /> Salvo</span>}
-                {noteStatus === "error" && <span className="flex items-center gap-1 text-xs text-destructive"><RefreshCw size={11} /> Falha</span>}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-1 flex-col">
-              {isBackendOnline ? (
-                <>
-                  <textarea
-                    value={quickNote}
-                    onChange={(e) => setQuickNote(e.target.value)}
-                    onKeyDown={(e) => (e.ctrlKey || e.metaKey) && e.key === "Enter" && handleSaveNote()}
-                    placeholder="Descarregue uma ideia..."
-                    className="min-h-[80px] flex-1 resize-none border-none bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
-                  />
-                  <Button size="icon-sm" variant="secondary" className="self-end" onClick={handleSaveNote} disabled={!quickNote.trim()}>
-                    <Send size={14} />
-                  </Button>
-                </>
-              ) : (
-                <p className="text-xs text-muted-foreground">Servidor Python inacessível.</p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div>
-          <p className="mb-2 px-0.5 text-xs font-medium text-muted-foreground">Hoje</p>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6">
-            <TasksSummaryCard tasks={tasks} onClick={() => navigate("/tasks")} />
-            <FinanceSummaryCard finance={finance} onClick={() => navigate("/finance")} />
-          </div>
-        </div>
-
-        <div>
-          <p className="mb-2 px-0.5 text-xs font-medium text-muted-foreground">Em breve</p>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6">
-            <UberCard />
-            <WeatherCard />
-          </div>
-        </div>
+      <div className="mx-auto w-full max-w-3xl space-y-5 p-4 md:p-6">
+        <ViewSwitcher />
+        <QuickCapture />
+        {homeViewStyle === "carta" && <CartaDoDiaView />}
+        {homeViewStyle === "terminal" && <TerminalView />}
+        {homeViewStyle === "heatmap" && <HeatmapView />}
+        {homeViewStyle === "capsula" && <CapsulaView />}
       </div>
     </div>
   );
