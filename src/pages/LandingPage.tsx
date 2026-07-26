@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -9,6 +9,38 @@ import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { LEGAL_INFO, enderecoCompleto } from "@/lib/legalInfo";
 import { cn } from "@/lib/utils";
+
+// =============================================================================
+// Revelação por scroll — cada seção nasce por baixo (opacidade/escala) conforme
+// entra na tela e "afunda" de volta ao sair, dando a sensação de a próxima
+// cobrir a anterior. Usa whileInView (IntersectionObserver) em vez de scroll
+// contínuo — mais robusto dentro do contêiner de scroll interno da página.
+// =============================================================================
+function ScrollReveal({
+  children,
+  className,
+  containerRef,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const [inView, setInView] = useState(false);
+
+  return (
+    <motion.div
+      initial={false}
+      animate={inView ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 40, scale: 0.97 }}
+      transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+      viewport={{ root: containerRef, amount: 0.25, margin: "0px 0px -10% 0px" }}
+      onViewportEnter={() => setInView(true)}
+      onViewportLeave={() => setInView(false)}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
 
 // =============================================================================
 // Cabeçalho
@@ -440,17 +472,18 @@ function Footer() {
 }
 
 export default function LandingPage() {
+  const scrollRef = useRef<HTMLDivElement>(null);
   return (
-    <div className="h-screen w-screen overflow-y-auto bg-background text-foreground">
+    <div ref={scrollRef} className="h-screen w-screen overflow-y-auto bg-background text-foreground">
       <Header />
       <Hero />
-      <DoisMundos />
-      <EmpresarialSection />
-      <PessoalSection />
-      <PrometheusSection />
-      <HowItWorks />
-      <Faq />
-      <FinalCta />
+      <ScrollReveal containerRef={scrollRef} className="relative"><DoisMundos /></ScrollReveal>
+      <ScrollReveal containerRef={scrollRef} className="relative"><EmpresarialSection /></ScrollReveal>
+      <ScrollReveal containerRef={scrollRef} className="relative"><PessoalSection /></ScrollReveal>
+      <ScrollReveal containerRef={scrollRef} className="relative"><PrometheusSection /></ScrollReveal>
+      <ScrollReveal containerRef={scrollRef} className="relative"><HowItWorks /></ScrollReveal>
+      <ScrollReveal containerRef={scrollRef} className="relative"><Faq /></ScrollReveal>
+      <ScrollReveal containerRef={scrollRef} className="relative"><FinalCta /></ScrollReveal>
       <Footer />
     </div>
   );
