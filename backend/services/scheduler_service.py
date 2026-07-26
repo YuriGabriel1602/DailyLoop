@@ -22,6 +22,7 @@ from services import (
     activity_log_service,
     ai_service,
     email_account_service,
+    google_calendar_sync_service,
     instagram_sync_service,
     whatsapp_service,
 )
@@ -32,6 +33,7 @@ logger = logging.getLogger(__name__)
 WATCHDOG_CHECK_MINUTES = 15
 EMAIL_POLL_MINUTES = 5
 INSTAGRAM_POLL_MINUTES = 5
+GOOGLE_CALENDAR_POLL_MINUTES = 20
 
 
 def _run_daily_briefing():
@@ -184,6 +186,20 @@ def _run_instagram_poll():
             logger.info("Instagram: %d mensagem(ns) nova(s) no total (%d conta(s)).", total, len(creds))
 
 
+def _run_google_calendar_poll():
+    """Espelha os eventos do Google Calendar de cada conta Pessoal conectada pro
+    banco local (GoogleCalendarEvent) — ver services/google_calendar_sync_service.py."""
+    with Session(engine) as session:
+        creds = session.exec(
+            select(IntegrationCredential).where(
+                IntegrationCredential.channel == "google", IntegrationCredential.status == "connected"
+            )
+        ).all()
+        total = sum(google_calendar_sync_service.sync_owner(cred.owner_id, session) for cred in creds)
+        if total:
+            logger.info("Google Calendar: %d evento(s) sincronizado(s) no total (%d conta(s)).", total, len(creds))
+
+
 _scheduler: BackgroundScheduler | None = None
 
 
@@ -217,13 +233,19 @@ def start_scheduler():
         IntervalTrigger(minutes=INSTAGRAM_POLL_MINUTES),
         id="instagram_poll",
     )
+    _scheduler.add_job(
+        _run_google_calendar_poll,
+        IntervalTrigger(minutes=GOOGLE_CALENDAR_POLL_MINUTES),
+        id="google_calendar_poll",
+    )
     _scheduler.start()
     logger.info(
         "Agendador iniciado: briefing diário às %dh (UTC), lembretes a cada %d min, watchdog a cada %d min, "
-        "email a cada %d min, instagram a cada %d min.",
+        "email a cada %d min, instagram a cada %d min, google calendar a cada %d min.",
         settings.daily_briefing_hour,
         settings.task_reminder_check_minutes,
         WATCHDOG_CHECK_MINUTES,
         EMAIL_POLL_MINUTES,
         INSTAGRAM_POLL_MINUTES,
+        GOOGLE_CALENDAR_POLL_MINUTES,
     )

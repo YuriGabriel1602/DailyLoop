@@ -352,6 +352,43 @@ class WhatsappPersonalMessage(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class GoogleCalendarEvent(SQLModel, table=True):
+    """Espelho local dos eventos do Google Calendar do dono — a Agenda passa a ler
+    daqui (rápido, sem depender da API do Google no ar) em vez de buscar ao vivo a
+    cada carregamento de tela. `services/google_calendar_sync_service.py` faz o
+    upsert periódico; `attendees_json`/`recurrence_json` guardam os campos que o
+    Google manda como lista/objeto, sem tabela própria (não são consultados por
+    coluna, só exibidos por inteiro no detalhe do evento)."""
+
+    __table_args__ = (UniqueConstraint("owner_id", "google_event_id", name="uq_google_calendar_event"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    owner_id: int = Field(foreign_key="user.id", index=True)
+    google_event_id: str = Field(index=True)
+    title: str = "(sem título)"
+    description: Optional[str] = None
+    location: Optional[str] = None
+    start_at: datetime = Field(index=True)
+    end_at: datetime
+    all_day: bool = False
+    timezone: Optional[str] = None
+    status: str = "confirmed"  # confirmed, tentative, cancelled
+    html_link: Optional[str] = None
+    hangout_link: Optional[str] = None
+    creator_email: Optional[str] = None
+    organizer_email: Optional[str] = None
+    organizer_name: Optional[str] = None
+    attendees_json: Optional[str] = None  # JSON: [{email, name, response_status}]
+    recurring_event_id: Optional[str] = None
+    recurrence_json: Optional[str] = None  # JSON: regras RRULE cruas do Google
+    color_id: Optional[str] = None
+    visibility: Optional[str] = None
+    transparency: Optional[str] = None  # opaque (ocupado) / transparent (livre)
+    google_created_at: Optional[datetime] = None
+    google_updated_at: Optional[datetime] = None
+    synced_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 # --- CONFIGURAÇÃO DO MOTOR ---
 
 connect_args = (
