@@ -187,7 +187,7 @@ export default function InboxPage() {
             className="w-full rounded-md border border-input bg-background py-1.5 pr-2 pl-7 text-xs outline-none focus:border-ring"
           />
         </div>
-        <ScrollArea className="flex-1">
+        <ScrollArea className="min-h-0 flex-1">
           {loadingList ? (
             <div className="space-y-2 p-3">
               {[0, 1, 2].map((i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}
@@ -274,7 +274,7 @@ export default function InboxPage() {
               )}
             </div>
 
-            <ScrollArea className="flex-1 px-4 md:px-6">
+            <ScrollArea className="min-h-0 flex-1 px-4 md:px-6">
               <div className="space-y-4 py-4">
                 {loadingMessages ? (
                   [0, 1, 2].map((i) => <Skeleton key={i} className="h-12 w-2/3 rounded-2xl" />)

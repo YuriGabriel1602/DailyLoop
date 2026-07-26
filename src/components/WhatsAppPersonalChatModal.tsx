@@ -293,7 +293,7 @@ export function WhatsAppPersonalChatModal({ open, onClose }: { open: boolean; on
               />
             </div>
 
-            <ScrollArea className="flex-1">
+            <ScrollArea className="min-h-0 flex-1">
               {loadingChats ? (
                 <div className="space-y-2 p-3">
                   {[0, 1, 2].map((i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}
@@ -381,7 +381,7 @@ export function WhatsAppPersonalChatModal({ open, onClose }: { open: boolean; on
                   </div>
                 )}
 
-                <ScrollArea className="flex-1 px-4">
+                <ScrollArea className="min-h-0 flex-1 px-4">
                   <div className="space-y-3 py-4">
                     {hasOlder && !(showMessageSearch && messageSearch.trim()) && (
                       <div className="flex justify-center pb-2">

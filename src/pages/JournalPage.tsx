@@ -54,7 +54,7 @@ export default function JournalPage() {
           </p>
         }
       />
-      <ScrollArea className="flex-1 px-4 md:px-6">
+      <ScrollArea className="min-h-0 flex-1 px-4 md:px-6">
         <div className="mx-auto max-w-2xl space-y-4 py-4">
           {!entries ? (
             <div className="space-y-3">

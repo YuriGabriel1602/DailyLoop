@@ -95,7 +95,7 @@ const PrometheusSheet = ({
             </span>
           </SheetTitle>
         </SheetHeader>
-        <ScrollArea className="flex-1 px-4">
+        <ScrollArea className="min-h-0 flex-1 px-4">
           <div className="space-y-4 py-4">
             {chat.map((msg, i) => (
               <div key={i} className={cn("flex gap-3", msg.role === "user" && "flex-row-reverse")}>
