@@ -182,6 +182,12 @@ const MODE_HOME_ROUTE: Record<WorldMode, string> = {
   personal: PERSONAL_NAV_ITEMS[0].to,
 };
 
+// Fonte da verdade é a rota, não o toggle — sem isso, chegar numa página de um mundo por
+// outro caminho (voltar do navegador, F5, link direto) deixa o toggle mostrando o mundo
+// errado enquanto o conteúdo já é do outro.
+const PERSONAL_PATHS = new Set(PERSONAL_NAV_ITEMS.map((item) => item.to));
+const BUSINESS_PATHS = new Set([...BUSINESS_NAV_ITEMS.map((item) => item.to), "/integrations/whatsapp-business"]);
+
 const ModeSwitcher = ({ collapsed }: { collapsed?: boolean }) => {
   const mode = useStore((s) => s.mode);
   const setMode = useStore((s) => s.setMode);
@@ -501,6 +507,7 @@ export const Layout = () => {
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const logout = useStore((s) => s.logout);
   const mode = useStore((s) => s.mode);
+  const setMode = useStore((s) => s.setMode);
   const updateUser = useStore((s) => s.updateUser);
   const navigate = useNavigate();
   const location = useLocation();
@@ -511,6 +518,12 @@ export const Layout = () => {
       navigate("/login", { replace: true });
     });
   }, [logout, navigate]);
+
+  useEffect(() => {
+    const path = location.pathname;
+    if (PERSONAL_PATHS.has(path) && mode !== "personal") setMode("personal");
+    else if (BUSINESS_PATHS.has(path) && mode !== "business") setMode("business");
+  }, [location.pathname, mode, setMode]);
 
   useEffect(() => {
     // Refaz o fetch do perfil ao montar — cobre sessões antigas com campos novos
