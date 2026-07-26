@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { CircleDot, Clock, GitPullRequest, Link2, Mail, Sparkles, Unlink } from "lucide-react";
 import { SiAnthropic, SiFacebook, SiGithub, SiGooglecalendar, SiInstagram, SiWhatsapp } from "react-icons/si";
 import type { IconType } from "react-icons";
 import { api, ApiError } from "@/lib/api";
+import { ensureFbSdkLoaded } from "@/lib/facebookSdk";
+import { useRealtimeSocket } from "@/lib/ws";
 import { useStore } from "@/store/useStore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,7 +27,8 @@ export type Channel =
   | "anthropic"
   | "google"
   | "open_finance"
-  | "whatsapp_personal";
+  | "whatsapp_personal"
+  | "instagram_personal";
 
 export interface Integration {
   id: number | null;
@@ -33,6 +37,7 @@ export interface Integration {
   status: "connected" | "disconnected";
   ai_default_mode: "24_7" | "off";
   created_at: string;
+  connection_mode?: "cloud_api" | "qr"; // só relevante pro channel="whatsapp"
 }
 
 export const CHANNEL_INFO: Record<Channel, { label: string; shortLabel: string; icon: IconType; hint: string; tokenHint: string; messaging: boolean; color: string }> = {
@@ -47,17 +52,44 @@ export const CHANNEL_INFO: Record<Channel, { label: string; shortLabel: string; 
   google: { label: "Google (Calendar/Gmail/Fit)", shortLabel: "Google", icon: SiGooglecalendar, hint: "", tokenHint: "", messaging: false, color: "#4285F4" },
   open_finance: { label: "Open Finance", shortLabel: "Open Finance", icon: Clock as unknown as IconType, hint: "", tokenHint: "", messaging: false, color: "#2fa1a8" },
   whatsapp_personal: { label: "WhatsApp Pessoal", shortLabel: "WhatsApp Pessoal", icon: SiWhatsapp, hint: "ID da conta Business (número pessoal)", tokenHint: "Token do Meta Business Manager", messaging: false, color: "#0d8a4f" },
+  instagram_personal: { label: "Instagram Pessoal", shortLabel: "Instagram", icon: SiInstagram, hint: "", tokenHint: "", messaging: false, color: "#E4405F" },
 };
 
 export const BUSINESS_CHANNELS: Channel[] = ["whatsapp", "instagram", "facebook", "github", "openai", "anthropic"];
-export const PERSONAL_CHANNELS: Channel[] = ["google", "open_finance", "whatsapp_personal"];
+export const PERSONAL_CHANNELS: Channel[] = ["google", "open_finance", "whatsapp_personal", "instagram_personal"];
+
+const OAUTH_META_CHANNELS: Channel[] = ["instagram", "instagram_personal"];
 
 export function IntegrationDetail({ integration, onChange }: { integration: Integration; onChange: () => void }) {
   const info = CHANNEL_INFO[integration.channel];
   const [accountId, setAccountId] = useState(integration.external_account_id);
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
+  const [whatsappQr, setWhatsappQr] = useState<string | null>(null);
+  const [whatsappBusinessQr, setWhatsappBusinessQr] = useState<string | null>(null);
   const connected = integration.status === "connected";
+
+  // Reusa o mesmo socket de eventos por usuário que já alimenta o Inbox em tempo real —
+  // o pareamento por QR Code (Pessoal ou Empresarial) manda QR/status por aqui em vez
+  // de inventar um transporte novo (backend/routers/whatsapp_{personal,business}.py ->
+  // connection_manager).
+  useRealtimeSocket("/api/inbox/ws", (event) => {
+    if (integration.channel === "whatsapp_personal") {
+      if (event.type === "whatsapp_personal_qr") {
+        setWhatsappQr(event.qr_data_url);
+      } else if (event.type === "whatsapp_personal_status") {
+        setWhatsappQr(null);
+        onChange();
+      }
+    } else if (integration.channel === "whatsapp") {
+      if (event.type === "whatsapp_business_qr") {
+        setWhatsappBusinessQr(event.qr_data_url);
+      } else if (event.type === "whatsapp_business_qr_status") {
+        setWhatsappBusinessQr(null);
+        onChange();
+      }
+    }
+  });
 
   const connect = async () => {
     if (!token.trim()) {
@@ -83,9 +115,39 @@ export function IntegrationDetail({ integration, onChange }: { integration: Inte
   const disconnect = async () => {
     setBusy(true);
     try {
-      await api.post(`/api/integrations/${integration.channel}/disconnect`);
+      const path =
+        integration.channel === "whatsapp_personal"
+          ? "/api/whatsapp-personal/disconnect"
+          : integration.channel === "whatsapp" && integration.connection_mode === "qr"
+            ? "/api/whatsapp-business/qr/disconnect"
+            : `/api/integrations/${integration.channel}/disconnect`;
+      await api.post(path);
       toast.success(`${info.label} desconectado.`);
       onChange();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const connectWhatsappPersonal = async () => {
+    setBusy(true);
+    try {
+      await api.post("/api/whatsapp-personal/connect");
+      toast.success("Escaneie o QR Code com o WhatsApp do seu celular.");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível iniciar o pareamento do WhatsApp.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const connectWhatsappBusinessQr = async () => {
+    setBusy(true);
+    try {
+      await api.post("/api/whatsapp-business/qr/connect");
+      toast.success("Escaneie o QR Code com o WhatsApp do número do negócio.");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível iniciar o pareamento do WhatsApp.");
     } finally {
       setBusy(false);
     }
@@ -103,6 +165,102 @@ export function IntegrationDetail({ integration, onChange }: { integration: Inte
       window.location.href = auth_url;
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Não foi possível iniciar a conexão com o Google.");
+      setBusy(false);
+    }
+  };
+
+  const connectMeta = async () => {
+    setBusy(true);
+    try {
+      const { auth_url } = await api.get<{ auth_url: string }>(
+        `/api/instagram/connect?channel=${integration.channel}`
+      );
+      window.location.href = auth_url;
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : `Não foi possível iniciar a conexão com o ${info.label}.`);
+      setBusy(false);
+    }
+  };
+
+  const connectWhatsappBusiness = async () => {
+    setBusy(true);
+    try {
+      const { app_id, whatsapp_embedded_signup_config_id } = await api.get<{
+        app_id: string;
+        whatsapp_embedded_signup_config_id: string;
+      }>("/api/meta/public-config");
+      if (!app_id || !whatsapp_embedded_signup_config_id) {
+        toast.error("Embedded Signup do WhatsApp ainda não configurado no servidor.");
+        setBusy(false);
+        return;
+      }
+      await ensureFbSdkLoaded(app_id);
+
+      // O code (callback do FB.login) e o waba_id/phone_number_id (postMessage do popup)
+      // chegam por dois canais separados e em ordem não garantida — junta os dois antes
+      // de submeter, disparando de qualquer um dos dois lados que chegar por último.
+      const pending: { code?: string; waba_id?: string; phone_number_id?: string } = {};
+      let submitted = false;
+
+      const trySubmit = async () => {
+        if (submitted || !pending.code || !pending.waba_id || !pending.phone_number_id) return;
+        submitted = true;
+        try {
+          await api.post("/api/whatsapp-business/embedded-signup", {
+            code: pending.code,
+            waba_id: pending.waba_id,
+            phone_number_id: pending.phone_number_id,
+          });
+          toast.success("WhatsApp Business conectado.");
+          onChange();
+        } catch (err) {
+          toast.error(err instanceof ApiError ? err.message : "Não foi possível conectar o WhatsApp.");
+        } finally {
+          setBusy(false);
+        }
+      };
+
+      const messageHandler = (event: MessageEvent) => {
+        if (event.origin !== "https://www.facebook.com") return;
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type !== "WA_EMBEDDED_SIGNUP") return;
+          if (data.event === "FINISH") {
+            pending.waba_id = data.data?.waba_id;
+            pending.phone_number_id = data.data?.phone_number_id;
+            trySubmit();
+          } else if (data.event === "CANCEL" || data.event === "ERROR") {
+            toast.error("Conexão do WhatsApp cancelada ou com erro.");
+            submitted = true;
+            setBusy(false);
+            window.removeEventListener("message", messageHandler);
+          }
+        } catch {
+          // mensagens que não são desse fluxo (não-JSON, outra origem) — ignora
+        }
+      };
+      window.addEventListener("message", messageHandler);
+
+      window.FB?.login(
+        (response) => {
+          if (!response.authResponse?.code) {
+            toast.error("Não foi possível concluir a conexão com o WhatsApp.");
+            setBusy(false);
+            window.removeEventListener("message", messageHandler);
+            return;
+          }
+          pending.code = response.authResponse.code;
+          trySubmit();
+        },
+        {
+          config_id: whatsapp_embedded_signup_config_id,
+          response_type: "code",
+          override_default_response_type: true,
+          extras: { sessionInfoVersion: "3" },
+        }
+      );
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível iniciar a conexão com o WhatsApp.");
       setBusy(false);
     }
   };
@@ -137,7 +295,22 @@ export function IntegrationDetail({ integration, onChange }: { integration: Inte
       <CardContent className="space-y-3">
         {connected ? (
           <>
-            <p className="truncate text-xs text-muted-foreground">Conta: {integration.external_account_id || "—"}</p>
+            <p className="truncate text-xs text-muted-foreground">
+              Conta: {integration.external_account_id || "—"}
+              {integration.channel === "whatsapp" && (
+                <span className="ml-1.5 font-mono text-[10px]">
+                  ({integration.connection_mode === "qr" ? "via QR Code" : "via Meta"})
+                </span>
+              )}
+            </p>
+            {integration.channel === "whatsapp" && (
+              <Link
+                to="/inbox"
+                className="block w-full rounded-lg border px-3 py-2 text-center text-xs font-medium transition-colors hover:bg-muted"
+              >
+                Abrir conversas no Inbox
+              </Link>
+            )}
             {info.messaging && (
               <div className="flex items-center justify-between rounded-lg border px-3 py-2">
                 <div>
@@ -159,6 +332,68 @@ export function IntegrationDetail({ integration, onChange }: { integration: Inte
             </p>
             <Button size="sm" onClick={connectGoogle} disabled={busy} className="w-full gap-1.5">
               <Link2 size={13} /> Conectar com Google
+            </Button>
+          </>
+        ) : OAUTH_META_CHANNELS.includes(integration.channel) ? (
+          <>
+            <p className="text-xs text-muted-foreground">
+              Login real com o Instagram — igual ao app oficial, você volta pra cá depois. A Meta só
+              libera troca de mensagens pra contas Instagram Profissionais (Business/Criador de
+              conteúdo); se sua conta for pessoal, o login funciona mas avisamos que não há conta
+              profissional pra conectar.
+            </p>
+            <Button size="sm" onClick={connectMeta} disabled={busy} className="w-full gap-1.5">
+              <Link2 size={13} /> Conectar com Instagram
+            </Button>
+          </>
+        ) : integration.channel === "whatsapp" ? (
+          <>
+            {whatsappBusinessQr ? (
+              <div className="flex flex-col items-center gap-2">
+                <img src={whatsappBusinessQr} alt="QR Code do WhatsApp Business" className="size-48 rounded-lg border" />
+                <p className="text-center text-[11px] text-muted-foreground">
+                  Abra o WhatsApp no celular do negócio → Aparelhos conectados → Conectar um aparelho, e escaneie.
+                </p>
+              </div>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  Conecta sua WABA (WhatsApp Business Account) direto pela Meta — sem precisar copiar
+                  token nenhum. Depois de conectar, configure templates e o contexto de IA em
+                  "Configurações do WhatsApp Business".
+                </p>
+                <Button size="sm" onClick={connectWhatsappBusiness} disabled={busy} className="w-full gap-1.5">
+                  <Link2 size={13} /> Conectar via Meta (oficial)
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Ou, se preferir usar o número de negócio direto via QR Code (protocolo não-oficial,
+                  sem verificação de Business Manager) — mesmo risco de banimento do WhatsApp Pessoal
+                  se a Meta detectar automação.
+                </p>
+              </>
+            )}
+            <Button size="sm" variant={whatsappBusinessQr ? "default" : "outline"} onClick={connectWhatsappBusinessQr} disabled={busy} className="w-full gap-1.5">
+              <Link2 size={13} /> {whatsappBusinessQr ? "Gerar novo QR Code" : "Conectar via QR Code (risco de ban)"}
+            </Button>
+          </>
+        ) : integration.channel === "whatsapp_personal" ? (
+          <>
+            {whatsappQr ? (
+              <div className="flex flex-col items-center gap-2">
+                <img src={whatsappQr} alt="QR Code do WhatsApp" className="size-48 rounded-lg border" />
+                <p className="text-center text-[11px] text-muted-foreground">
+                  Abra o WhatsApp no celular → Aparelhos conectados → Conectar um aparelho, e escaneie.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Conecta seu número pessoal de verdade via QR Code (protocolo não-oficial, tipo
+                WhatsApp Web) — sem ser a API oficial da Meta. Recomendamos um número de teste, já
+                que existe risco de banimento se a Meta detectar automação.
+              </p>
+            )}
+            <Button size="sm" onClick={connectWhatsappPersonal} disabled={busy} className="w-full gap-1.5">
+              <Link2 size={13} /> {whatsappQr ? "Gerar novo QR Code" : "Conectar via QR Code"}
             </Button>
           </>
         ) : (

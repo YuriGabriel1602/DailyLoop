@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { Mail } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
+import { Mail, Settings2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,10 +13,20 @@ import {
 
 type Selection = Channel | "email";
 
+const OAUTH_RESULT_MESSAGES: Record<string, { text: string; variant: "success" | "error" }> = {
+  conectado: { text: "Conectado com sucesso.", variant: "success" },
+  sem_conta_business: {
+    text: "Login feito, mas essa conta do Instagram não é Profissional (Business/Criador de conteúdo) — a Meta não libera troca de mensagens pra contas pessoais.",
+    variant: "error",
+  },
+  erro: { text: "Não foi possível conectar — tente novamente.", variant: "error" },
+};
+
 export default function IntegrationsPage() {
   const [integrations, setIntegrations] = useState<Integration[] | null>(null);
   const [emailConnected, setEmailConnected] = useState(false);
   const [selected, setSelected] = useState<Selection | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const load = () => {
     api.get<Integration[]>("/api/integrations").then((data) => {
@@ -25,6 +37,17 @@ export default function IntegrationsPage() {
   };
 
   useEffect(load, []);
+
+  useEffect(() => {
+    const value = searchParams.get("instagram");
+    if (value) {
+      const message = OAUTH_RESULT_MESSAGES[value];
+      if (message) (message.variant === "success" ? toast.success : toast.error)(message.text);
+      searchParams.delete("instagram");
+      setSearchParams(searchParams, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const byChannel = Object.fromEntries((integrations ?? []).map((i) => [i.channel, i])) as Record<Channel, Integration>;
   const selectedIntegration = selected && selected !== "email" ? byChannel[selected] : null;
@@ -102,6 +125,14 @@ export default function IntegrationsPage() {
               <div className={cn("grid gap-4", selectedIntegration.channel === "github" && selectedIntegration.status === "connected" ? "md:grid-cols-[320px_1fr]" : "max-w-sm")}>
                 <IntegrationDetail integration={selectedIntegration} onChange={load} />
                 {selectedIntegration.channel === "github" && selectedIntegration.status === "connected" && <GithubPanel />}
+                {selectedIntegration.channel === "whatsapp" && selectedIntegration.status === "connected" && (
+                  <Link
+                    to="/integrations/whatsapp-business"
+                    className="inline-flex w-fit items-center gap-1.5 text-xs text-primary hover:underline"
+                  >
+                    <Settings2 size={13} /> Configurar templates e IA dessa WABA
+                  </Link>
+                )}
               </div>
             )}
             {selected === "email" && <EmailAccountCard />}

@@ -444,7 +444,16 @@ def answer_conversation(session: Session, user: User, conversation: Conversation
     cred = session.exec(
         select(IntegrationCredential).where(IntegrationCredential.owner_id == user.id, IntegrationCredential.channel == provider)
     ).first()
-    custom_context = cred.custom_context if cred else None
+    # Contexto do provedor de IA (openai/anthropic/gemini) + contexto específico do canal
+    # da conversa (ex: instruções só pra essa WABA) — os dois são independentes e se somam.
+    channel_cred = session.exec(
+        select(IntegrationCredential).where(
+            IntegrationCredential.owner_id == user.id, IntegrationCredential.channel == conversation.channel
+        )
+    ).first()
+    custom_context = "\n\n".join(
+        filter(None, [cred.custom_context if cred else None, channel_cred.custom_context if channel_cred else None])
+    ) or None
 
     usage_sink: dict = {}
     reply = _generate(

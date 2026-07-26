@@ -117,6 +117,11 @@ class Contact(SQLModel, table=True):
     external_id: str = Field(index=True)  # id do contato na plataforma de origem
     stage: str = "novo"  # novo, qualificado, convertido, perdido
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    # Só preenchido pra contatos vindos do WhatsApp via QR Code (Baileys) — o JID
+    # completo (ex: "5551999999999@s.whatsapp.net", ou "@lid" nos contatos mais novos)
+    # é necessário pra ENVIAR de volta, já que `external_id` guarda só os dígitos do
+    # telefone (convenção da Cloud API oficial) pra casar contatos vindos dos dois canais.
+    whatsapp_jid: Optional[str] = None
 
 
 class IntegrationCredential(SQLModel, table=True):
@@ -133,6 +138,10 @@ class IntegrationCredential(SQLModel, table=True):
     status: str = "disconnected"  # disconnected, connected
     ai_default_mode: str = "24_7"  # 24_7, off
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    # Só relevante pro channel="whatsapp": "cloud_api" (Meta oficial, via token/Embedded
+    # Signup) ou "qr" (número pessoal pareado via QR Code, sem ser a API oficial —
+    # mesmo mecanismo do WhatsApp Pessoal, com risco de banimento pela Meta).
+    connection_mode: str = "cloud_api"
     # Config extra por provedor de IA (channel="openai"/"anthropic"/"gemini") — os demais
     # canais (whatsapp/instagram/facebook) simplesmente nunca preenchem esses campos.
     custom_context: Optional[str] = None  # instrução extra só pra esse provedor
@@ -182,6 +191,9 @@ class ConversationMessage(SQLModel, table=True):
     content: str
     external_message_id: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    message_type: str = "text"  # text, image, unsupported
+    media_path: Optional[str] = None  # caminho relativo em disco, só quando message_type="image"
+    media_mime: Optional[str] = None
 
 
 # --- ECOSSISTEMA PESSOAL ---
@@ -305,6 +317,41 @@ class EmailAccount(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class WhatsappPersonalChat(SQLModel, table=True):
+    """Uma conversa 1-a-1 do WhatsApp Pessoal (via sidecar Baileys) — separado de
+    Contact/Conversation (que são do CRM de leads do WhatsApp Business, com stage/
+    ai_enabled que não fazem sentido aqui) de propósito."""
+
+    __table_args__ = (UniqueConstraint("owner_id", "jid", name="uq_wa_personal_chat_owner_jid"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    owner_id: int = Field(foreign_key="user.id", index=True)
+    jid: str = Field(index=True)  # remoteJid do Baileys, ex "5551999999999@s.whatsapp.net"
+    name: str = ""
+    phone_number: str = ""
+    last_message_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    archived: bool = False
+    unread_count: int = 0
+    # False pra contatos sincronizados da agenda que nunca trocaram mensagem — só vira
+    # True quando a primeira mensagem de fato é registrada, pra não misturar "contato
+    # conhecido" com "conversa real" na ordenação da lista.
+    has_conversation: bool = False
+
+
+class WhatsappPersonalMessage(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    chat_id: int = Field(foreign_key="whatsapppersonalchat.id", index=True)
+    direction: str  # inbound, outbound
+    message_type: str = "text"  # text, image, unsupported
+    content: str = ""  # texto / legenda da imagem / rótulo do placeholder de mídia não suportada
+    media_path: Optional[str] = None  # caminho relativo em disco, só quando message_type="image"
+    media_mime: Optional[str] = None
+    external_message_id: str = ""
+    status: str = "sent"  # sent, failed — só relevante pra outbound
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 # --- CONFIGURAÇÃO DO MOTOR ---
 
 connect_args = (
@@ -330,6 +377,14 @@ def _run_lightweight_migrations():
         ("integrationcredential", "usage_reset_month", "ALTER TABLE integrationcredential ADD COLUMN usage_reset_month VARCHAR"),
         ("integrationcredential", "phone_number_id", "ALTER TABLE integrationcredential ADD COLUMN phone_number_id VARCHAR DEFAULT ''"),
         ("businessaisettings", "timezone", "ALTER TABLE businessaisettings ADD COLUMN timezone VARCHAR DEFAULT 'America/Sao_Paulo'"),
+        ("whatsapppersonalchat", "archived", "ALTER TABLE whatsapppersonalchat ADD COLUMN archived BOOLEAN DEFAULT 0"),
+        ("whatsapppersonalchat", "unread_count", "ALTER TABLE whatsapppersonalchat ADD COLUMN unread_count INTEGER DEFAULT 0"),
+        ("whatsapppersonalchat", "has_conversation", "ALTER TABLE whatsapppersonalchat ADD COLUMN has_conversation BOOLEAN DEFAULT 0"),
+        ("contact", "whatsapp_jid", "ALTER TABLE contact ADD COLUMN whatsapp_jid VARCHAR"),
+        ("integrationcredential", "connection_mode", "ALTER TABLE integrationcredential ADD COLUMN connection_mode VARCHAR DEFAULT 'cloud_api'"),
+        ("conversationmessage", "message_type", "ALTER TABLE conversationmessage ADD COLUMN message_type VARCHAR DEFAULT 'text'"),
+        ("conversationmessage", "media_path", "ALTER TABLE conversationmessage ADD COLUMN media_path VARCHAR"),
+        ("conversationmessage", "media_mime", "ALTER TABLE conversationmessage ADD COLUMN media_mime VARCHAR"),
     ]
     with engine.connect() as conn:
         for table_name, column_name, ddl in migrations:

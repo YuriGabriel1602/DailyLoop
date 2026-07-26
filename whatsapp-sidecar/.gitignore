@@ -1,0 +1,4 @@
+node_modules/
+.env
+# Chaves reais do dispositivo WhatsApp em JSON puro — segredo em repouso, nunca commitar.
+sessions/

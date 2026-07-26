@@ -44,6 +44,7 @@ def _public(cred: IntegrationCredential) -> dict:
         "custom_context": cred.custom_context,
         "monthly_token_limit": cred.monthly_token_limit,
         "tokens_used_this_month": cred.tokens_used_this_month,
+        "connection_mode": cred.connection_mode,
     }
 
 

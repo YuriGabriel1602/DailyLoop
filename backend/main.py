@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import logging.handlers
 import sys
@@ -30,10 +31,12 @@ from routers import (
     hive,
     inbox,
     insights,
+    instagram_auth,
     integrations,
     journal,
     logs,
     meta,
+    meta_auth,
     notes,
     notifications,
     people,
@@ -41,7 +44,11 @@ from routers import (
     tags,
     tasks,
     webhooks,
+    whatsapp_business,
+    whatsapp_personal,
+    whatsapp_templates,
 )
+from services.connection_manager import manager
 from services.scheduler_service import start_scheduler
 
 
@@ -66,6 +73,11 @@ def _configure_logging():
     root_logger.setLevel(logging.INFO)
     root_logger.addHandler(file_handler)
     root_logger.addHandler(console_handler)
+
+    # httpx loga "HTTP Request: {method} {url} ..." em INFO, e várias chamadas nossas
+    # (ex: instagram_oauth_service, troca de token de longa duração) passam client_secret
+    # e access_token como query string — isso vazava credenciais em texto puro no log.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 _configure_logging()
@@ -101,6 +113,11 @@ app.include_router(rituals.router)
 app.include_router(goals.router)
 app.include_router(logs.router)
 app.include_router(google_auth.router)
+app.include_router(meta_auth.router)
+app.include_router(instagram_auth.router)
+app.include_router(whatsapp_business.router)
+app.include_router(whatsapp_templates.router)
+app.include_router(whatsapp_personal.router)
 app.include_router(hive.router)
 app.include_router(calendar.router)
 app.include_router(gmail.router)
@@ -110,8 +127,9 @@ app.include_router(email_accounts.router)
 
 
 @app.on_event("startup")
-def on_startup():
+async def on_startup():
     create_db_and_tables()
+    manager.bind_main_loop(asyncio.get_running_loop())
     start_scheduler()
     logging.getLogger(__name__).info("DailyLoop Backend: Sistemas Online.")
 

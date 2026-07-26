@@ -93,6 +93,39 @@ class Settings:
     # provando que o payload veio mesmo da Meta e não foi forjado por terceiros.
     meta_app_secret: str = os.getenv("META_APP_SECRET", "")
 
+    # App ID do app da Meta (público) — usado pelo SDK JS do WhatsApp Embedded Signup no frontend.
+    meta_app_id: str = os.getenv("META_APP_ID", "")
+    meta_graph_api_version: str = os.getenv("META_GRAPH_API_VERSION", "v20.0")
+
+    # Configuration ID do fluxo "WhatsApp Embedded Signup" (Meta App Dashboard > WhatsApp >
+    # Embedded Signup) — usado pelo SDK JS no frontend pra conectar uma WABA sem colar token.
+    whatsapp_embedded_signup_config_id: str = os.getenv("WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID", "")
+
+    # Login direto do Instagram (produto separado do "Login do Facebook para Empresas" —
+    # tem App ID/Secret próprios, distintos de meta_app_id/meta_app_secret). Só assim dá
+    # pra ler/responder DM do Instagram hoje — o fluxo antigo via Página do Facebook não
+    # tem mais essa permissão liberada nesse app.
+    instagram_app_id: str = os.getenv("INSTAGRAM_APP_ID", "")
+    instagram_app_secret: str = os.getenv("INSTAGRAM_APP_SECRET", "")
+    instagram_redirect_uri: str = os.getenv(
+        "INSTAGRAM_REDIRECT_URI", "http://127.0.0.1:8000/api/instagram/callback"
+    )
+
+    # Sidecar Node.js (Baileys) que pareia o WhatsApp Pessoal via QR Code — processo
+    # separado (`whatsapp-sidecar/`) porque esse protocolo não tem SDK Python oficial.
+    whatsapp_sidecar_url: str = os.getenv("WHATSAPP_SIDECAR_URL", "http://127.0.0.1:8100")
+    # Onde ficam as imagens recebidas/enviadas no chat do WhatsApp Pessoal, uma
+    # subpasta por owner_id — servidas de volta via endpoint autenticado, nunca
+    # como StaticFiles público.
+    whatsapp_personal_media_dir: Path = BACKEND_DIR / "media" / "whatsapp_personal"
+    # Mesma ideia, só que pro Inbox/CRM Empresarial (contatos vindos do WhatsApp
+    # Business via QR Code — a Cloud API oficial ainda não manda/recebe mídia aqui).
+    whatsapp_business_media_dir: Path = BACKEND_DIR / "media" / "whatsapp_business"
+    # Segredo compartilhado nos dois sentidos (backend chama sidecar pra iniciar/encerrar
+    # pareamento; sidecar chama o backend pra avisar QR novo/conectado) — nenhum dos dois
+    # lados tem um JWT de usuário logado nesse contexto.
+    sidecar_shared_secret: str = os.getenv("SIDECAR_SHARED_SECRET", "")
+
     # OAuth Google (Calendar/Gmail/Fit) — crie um projeto em https://console.cloud.google.com,
     # habilite as APIs Calendar/Gmail/Fitness, configure a tela de consentimento e crie uma
     # credencial "OAuth client ID" tipo Web application com o redirect URI abaixo cadastrado.

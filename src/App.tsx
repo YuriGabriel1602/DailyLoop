@@ -15,6 +15,7 @@ import HivePage from "./pages/HivePage";
 import CrmPage from "./pages/CrmPage";
 import InboxPage from "./pages/InboxPage";
 import IntegrationsPage from "./pages/IntegrationsPage";
+import WhatsAppBusinessPage from "./pages/WhatsAppBusinessPage";
 import AreasPage from "./pages/AreasPage";
 import PeoplePage from "./pages/PeoplePage";
 import JournalPage from "./pages/JournalPage";
@@ -68,6 +69,7 @@ function App() {
             <Route path="crm" element={<CrmPage />} />
             <Route path="inbox" element={<InboxPage />} />
             <Route path="integrations" element={<IntegrationsPage />} />
+            <Route path="integrations/whatsapp-business" element={<WhatsAppBusinessPage />} />
             <Route path="areas" element={<AreasPage />} />
             <Route path="pessoas" element={<PeoplePage />} />
             <Route path="diario" element={<JournalPage />} />

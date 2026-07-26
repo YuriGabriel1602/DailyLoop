@@ -2,17 +2,14 @@ import hashlib
 import hmac
 import json
 import logging
-from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlmodel import Session, select
 
 from config import settings
-from database import BusinessAISettings, Contact, Conversation, ConversationMessage, IntegrationCredential, User, get_session
-from services import activity_log_service, ai_service, crypto_service, meta_messaging_service, whatsapp_service
-from services.connection_manager import manager
-from services.notification_service import notify
+from database import IntegrationCredential, get_session
+from services.lead_inbound_service import handle_inbound_message
 
 logger = logging.getLogger(__name__)
 
@@ -75,133 +72,6 @@ def _resolve_credential(channel: str, external_account_id: str, session: Session
     ).first()
 
 
-def _get_or_create_contact(owner_id: int, channel: str, external_id: str, name: str, session: Session) -> Contact:
-    contact = session.exec(
-        select(Contact).where(
-            Contact.owner_id == owner_id, Contact.channel == channel, Contact.external_id == external_id
-        )
-    ).first()
-    if contact:
-        return contact
-    contact = Contact(owner_id=owner_id, channel=channel, external_id=external_id, name=name or external_id)
-    session.add(contact)
-    session.commit()
-    session.refresh(contact)
-    return contact
-
-
-def _get_or_create_conversation(
-    owner_id: int, contact: Contact, channel: str, ai_default_mode: str, session: Session
-) -> Conversation:
-    conversation = session.exec(
-        select(Conversation).where(
-            Conversation.owner_id == owner_id, Conversation.contact_id == contact.id, Conversation.status == "open"
-        )
-    ).first()
-    if conversation:
-        return conversation
-    conversation = Conversation(
-        owner_id=owner_id,
-        contact_id=contact.id,
-        channel=channel,
-        ai_enabled=(ai_default_mode == "24_7"),
-    )
-    session.add(conversation)
-    session.commit()
-    session.refresh(conversation)
-    return conversation
-
-
-async def _handle_inbound_message(
-    *,
-    owner_id: int,
-    channel: str,
-    contact_external_id: str,
-    contact_name: str,
-    text: str,
-    external_message_id: Optional[str],
-    session: Session,
-    is_group: bool = False,
-    whatsapp_phone_number_id: str = "",
-):
-    cred = session.exec(
-        select(IntegrationCredential).where(
-            IntegrationCredential.owner_id == owner_id, IntegrationCredential.channel == channel
-        )
-    ).first()
-    contact = _get_or_create_contact(owner_id, channel, contact_external_id, contact_name, session)
-    conversation = _get_or_create_conversation(
-        owner_id, contact, channel, cred.ai_default_mode if cred else "24_7", session
-    )
-
-    inbound = ConversationMessage(
-        conversation_id=conversation.id,
-        direction="inbound",
-        sender="contact",
-        content=text,
-        external_message_id=external_message_id,
-    )
-    session.add(inbound)
-    conversation.last_message_at = datetime.utcnow()
-    session.add(conversation)
-    session.commit()
-    session.refresh(inbound)
-
-    await manager.broadcast_to_user(
-        owner_id,
-        {"type": "message", "conversation_id": conversation.id, "message": inbound.model_dump(mode="json")},
-    )
-    activity_log_service.log(
-        session, owner_id, "empresarial", "inbox.message_received",
-        f"{contact.name} ({channel}) mandou uma mensagem",
-    )
-    owner_for_notify = session.get(User, owner_id)
-    if owner_for_notify:
-        notify(
-            session, owner_for_notify, "inbox_new_message",
-            email_subject="Nova mensagem no Inbox — DailyLoop",
-            email_body=f"{contact.name} ({channel}) mandou: \"{text[:200]}\"",
-        )
-
-    if not conversation.ai_enabled:
-        return
-
-    if is_group:
-        ai_settings = session.exec(select(BusinessAISettings).where(BusinessAISettings.owner_id == owner_id)).first()
-        if not ai_settings or ai_settings.ignore_whatsapp_groups:
-            logger.info("Mensagem de grupo ignorada pela IA (owner_id=%s)", owner_id)
-            return
-
-    owner = session.get(User, owner_id)
-    reply_text = ai_service.answer_conversation(session, owner, conversation, text)
-
-    outbound = ConversationMessage(conversation_id=conversation.id, direction="outbound", sender="ai", content=reply_text)
-    session.add(outbound)
-    conversation.last_message_at = datetime.utcnow()
-    session.add(conversation)
-    session.commit()
-    session.refresh(outbound)
-
-    if channel == "whatsapp":
-        token = crypto_service.decrypt(cred.access_token_encrypted) if cred and cred.access_token_encrypted else ""
-        whatsapp_service.send_whatsapp_text(
-            contact_external_id, reply_text, access_token=token, phone_number_id=whatsapp_phone_number_id
-        )
-    elif cred and cred.access_token_encrypted:
-        token = crypto_service.decrypt(cred.access_token_encrypted)
-        meta_messaging_service.send_meta_text(
-            channel=channel, page_access_token=token, recipient_id=contact_external_id, body=reply_text
-        )
-
-    await manager.broadcast_to_user(
-        owner_id,
-        {"type": "message", "conversation_id": conversation.id, "message": outbound.model_dump(mode="json")},
-    )
-    activity_log_service.log(
-        session, owner_id, "empresarial", "inbox.ai_replied", f"IA respondeu {contact.name} ({channel})"
-    )
-
-
 @router.post("/meta")
 async def receive_webhook(request: Request, session: Session = Depends(get_session)):
     raw_body = await request.body()
@@ -242,7 +112,7 @@ async def receive_webhook(request: Request, session: Session = Depends(get_sessi
                         continue
                     wa_id = msg.get("from", "")
                     text = msg.get("text", {}).get("body", "")
-                    await _handle_inbound_message(
+                    await handle_inbound_message(
                         owner_id=cred.owner_id,
                         channel=channel,
                         contact_external_id=wa_id,
@@ -251,7 +121,6 @@ async def receive_webhook(request: Request, session: Session = Depends(get_sessi
                         external_message_id=msg.get("id"),
                         session=session,
                         is_group=_is_group_message(msg),
-                        whatsapp_phone_number_id=cred.phone_number_id,
                     )
         else:
             for messaging_event in entry.get("messaging", []):
@@ -260,7 +129,7 @@ async def receive_webhook(request: Request, session: Session = Depends(get_sessi
                 if not message or message.get("is_echo") or not text:
                     continue
                 sender_id = messaging_event.get("sender", {}).get("id", "")
-                await _handle_inbound_message(
+                await handle_inbound_message(
                     owner_id=cred.owner_id,
                     channel=channel,
                     contact_external_id=sender_id,

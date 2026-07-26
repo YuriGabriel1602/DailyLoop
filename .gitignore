@@ -33,9 +33,14 @@ __pycache__/
 *.pyc
 backend/venv/
 backend/logs/
+backend/media/
 
 # Local databases
 *.db
+
+# WhatsApp Pessoal/Business via QR Code (Baileys) — chaves de sessão do
+# pareamento, nunca podem ir pro Git (equivalem a estar logado no WhatsApp).
+whatsapp-sidecar/sessions/
 
 # design-sync converter (staged scripts, generated bundle, machine state)
 .ds-sync/

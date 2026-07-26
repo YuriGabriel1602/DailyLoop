@@ -1,15 +1,30 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
+import { Settings2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
+import { WhatsAppPersonalChatModal } from "@/components/WhatsAppPersonalChatModal";
 import { cn } from "@/lib/utils";
 import {
   AiEngineCard, CHANNEL_INFO, IntegrationDetail, PERSONAL_CHANNELS, type Channel, type Integration,
 } from "@/lib/integrationsShared";
 
+const OAUTH_RESULT_MESSAGES: Record<string, { text: string; variant: "success" | "error" }> = {
+  conectado: { text: "Conectado com sucesso.", variant: "success" },
+  sem_conta_business: {
+    text: "Login feito, mas essa conta do Instagram não é Profissional (Business/Criador de conteúdo) — a Meta não libera troca de mensagens pra contas pessoais.",
+    variant: "error",
+  },
+  erro: { text: "Não foi possível conectar — tente novamente.", variant: "error" },
+};
+
 export default function PersonalIntegrationsPage() {
   const [integrations, setIntegrations] = useState<Integration[] | null>(null);
   const [selected, setSelected] = useState<Channel | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const load = () => {
     api.get<Integration[]>("/api/integrations").then((data) => {
@@ -19,6 +34,19 @@ export default function PersonalIntegrationsPage() {
   };
 
   useEffect(load, []);
+
+  useEffect(() => {
+    for (const key of ["google", "instagram_personal"]) {
+      const value = searchParams.get(key);
+      if (!value) continue;
+      const message = OAUTH_RESULT_MESSAGES[value];
+      if (message) (message.variant === "success" ? toast.success : toast.error)(message.text);
+      searchParams.delete(key);
+      setSearchParams(searchParams, { replace: true });
+      break;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const byChannel = Object.fromEntries((integrations ?? []).map((i) => [i.channel, i])) as Record<Channel, Integration>;
   const selectedIntegration = selected ? byChannel[selected] : null;
@@ -54,16 +82,34 @@ export default function PersonalIntegrationsPage() {
                 const info = CHANNEL_INFO[channel];
                 const integration = byChannel[channel];
                 const connected = integration?.status === "connected";
+                const chatShortcut = channel === "whatsapp_personal" && connected;
                 return (
-                  <button
+                  <div
                     key={channel}
-                    onClick={() => setSelected(channel)}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => (chatShortcut ? setChatOpen(true) : setSelected(channel))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") (chatShortcut ? setChatOpen(true) : setSelected(channel));
+                    }}
                     className={cn(
-                      "flex flex-col items-center gap-2 rounded-xl border bg-card p-3 text-center transition-colors hover:bg-muted/40",
+                      "relative flex cursor-pointer flex-col items-center gap-2 rounded-xl border bg-card p-3 text-center transition-colors hover:bg-muted/40",
                       selected === channel && "ring-2 ring-primary",
                       connected && "border-[var(--success)]/40"
                     )}
                   >
+                    {chatShortcut && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelected(channel);
+                        }}
+                        className="absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                      >
+                        <Settings2 size={12} />
+                      </button>
+                    )}
                     <span className="flex size-9 items-center justify-center rounded-lg text-white" style={{ background: info.color }}>
                       <info.icon size={16} />
                     </span>
@@ -71,7 +117,7 @@ export default function PersonalIntegrationsPage() {
                     <span className={cn("text-[10px] font-mono", connected ? "text-[var(--success)]" : "text-muted-foreground")}>
                       {connected ? "conectado" : "conectar"}
                     </span>
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -86,6 +132,7 @@ export default function PersonalIntegrationsPage() {
           </>
         )}
       </div>
+      <WhatsAppPersonalChatModal open={chatOpen} onClose={() => setChatOpen(false)} />
     </div>
   );
 }

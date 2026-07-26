@@ -1,8 +1,15 @@
 import logging
+from typing import TYPE_CHECKING, Optional
 
 import httpx
+from sqlmodel import Session, select
 
 from config import settings
+from database import IntegrationCredential
+from services import crypto_service, instagram_service, meta_messaging_service
+
+if TYPE_CHECKING:
+    from database import Contact
 
 logger = logging.getLogger(__name__)
 
@@ -90,3 +97,70 @@ def send_whatsapp_text(to: str, body: str, *, access_token: str, phone_number_id
     except Exception:
         logger.exception("Falha ao enviar texto livre WhatsApp para %s", to)
         return False
+
+
+def _send_whatsapp_qr(owner_id: int, jid: str, content: str, image_base64: Optional[str], mime_type: Optional[str]) -> bool:
+    try:
+        with httpx.Client(timeout=20.0) as client:
+            response = client.post(
+                f"{settings.whatsapp_sidecar_url}/sessions/{owner_id}/business/send",
+                headers={"X-Sidecar-Secret": settings.sidecar_shared_secret},
+                json={
+                    "jid": jid,
+                    "text": content if not image_base64 else None,
+                    "image_base64": image_base64,
+                    "mime_type": mime_type,
+                    "caption": content if image_base64 else None,
+                },
+            )
+        return response.status_code < 400
+    except httpx.RequestError:
+        logger.exception("Falha ao contatar o sidecar pra enviar mensagem de WhatsApp Business (owner_id=%s)", owner_id)
+        return False
+
+
+def send_business_message(
+    owner_id: int,
+    channel: str,
+    contact: "Contact",
+    content: str,
+    session: Session,
+    *,
+    image_base64: Optional[str] = None,
+    mime_type: Optional[str] = None,
+) -> bool:
+    """Único lugar que decide COMO uma resposta do Inbox/CRM sai de verdade —
+    WhatsApp Cloud API oficial, WhatsApp via QR Code (sidecar Baileys) ou Meta
+    genérico (Instagram/Facebook). Usado por `routers/inbox.py` (resposta manual),
+    `services/scheduler_service.py` (watchdog) e `services/lead_inbound_service.py`
+    (resposta automática da IA) — nenhum dos três decide o transporte por conta própria."""
+    cred = session.exec(
+        select(IntegrationCredential).where(
+            IntegrationCredential.owner_id == owner_id, IntegrationCredential.channel == channel
+        )
+    ).first()
+
+    if channel == "whatsapp":
+        if cred and cred.connection_mode == "qr":
+            jid = contact.whatsapp_jid or f"{contact.external_id}@s.whatsapp.net"
+            return _send_whatsapp_qr(owner_id, jid, content, image_base64, mime_type)
+        if not cred or not cred.access_token_encrypted or not cred.phone_number_id:
+            return False
+        if image_base64:
+            logger.warning("Envio de imagem pela Cloud API oficial ainda não suportado — mensagem não enviada.")
+            return False
+        token = crypto_service.decrypt(cred.access_token_encrypted)
+        return send_whatsapp_text(contact.external_id, content, access_token=token, phone_number_id=cred.phone_number_id)
+
+    if not cred or not cred.access_token_encrypted:
+        return False
+    token = crypto_service.decrypt(cred.access_token_encrypted)
+
+    if channel == "instagram":
+        # Login direto do Instagram (graph.instagram.com) — não é mais um token de
+        # Página do Facebook, por isso não passa por meta_messaging_service.
+        return instagram_service.send_instagram_text(token, contact.external_id, content)
+
+    return meta_messaging_service.send_meta_text(
+        channel=channel, page_access_token=token, recipient_id=contact.external_id, body=content
+    )

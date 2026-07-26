@@ -21,9 +21,8 @@ from database import (
 from services import (
     activity_log_service,
     ai_service,
-    crypto_service,
     email_account_service,
-    meta_messaging_service,
+    instagram_sync_service,
     whatsapp_service,
 )
 from services.notification_service import notify
@@ -32,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 WATCHDOG_CHECK_MINUTES = 15
 EMAIL_POLL_MINUTES = 5
+INSTAGRAM_POLL_MINUTES = 5
 
 
 def _run_daily_briefing():
@@ -88,35 +88,14 @@ def _run_task_reminders():
 
 
 def _send_reply_to_channel(conversation: Conversation, content: str, session: Session) -> bool:
-    """Mesmo padrão de envio de `routers/inbox.py::_send_to_channel` — duplicado aqui de
-    propósito pra não acoplar um service de baixo nível a um router."""
+    """WhatsApp/Instagram/Facebook passam pelo dispatcher único
+    `whatsapp_service.send_business_message` (mesmo usado por `routers/inbox.py` e pela
+    resposta automática da IA em `services/lead_inbound_service.py`); email continua
+    fora dele porque esse dispatcher só cobre canais de mensageria via Meta/Baileys."""
     contact = session.get(Contact, conversation.contact_id)
     if not contact:
         return False
-    if conversation.channel == "whatsapp":
-        cred = session.exec(
-            select(IntegrationCredential).where(
-                IntegrationCredential.owner_id == conversation.owner_id, IntegrationCredential.channel == "whatsapp"
-            )
-        ).first()
-        if not cred or not cred.access_token_encrypted or not cred.phone_number_id:
-            return False
-        token = crypto_service.decrypt(cred.access_token_encrypted)
-        return whatsapp_service.send_whatsapp_text(
-            contact.external_id, content, access_token=token, phone_number_id=cred.phone_number_id
-        )
-    cred = session.exec(
-        select(IntegrationCredential).where(
-            IntegrationCredential.owner_id == conversation.owner_id,
-            IntegrationCredential.channel == conversation.channel,
-        )
-    ).first()
-    if not cred or not cred.access_token_encrypted:
-        return False
-    token = crypto_service.decrypt(cred.access_token_encrypted)
-    return meta_messaging_service.send_meta_text(
-        channel=conversation.channel, page_access_token=token, recipient_id=contact.external_id, body=content
-    )
+    return whatsapp_service.send_business_message(conversation.owner_id, conversation.channel, contact, content, session)
 
 
 def _run_conversation_watchdog():
@@ -190,6 +169,21 @@ def _run_email_poll():
             logger.info("Email: %d mensagem(ns) nova(s) importada(s) de %d conta(s).", total_imported, len(accounts))
 
 
+def _run_instagram_poll():
+    """Instagram ainda não publicado no Meta for Developers não recebe webhook — poll
+    periódico via Conversations API preenche essa lacuna (ver
+    services/instagram_sync_service.py; trocar por webhook quando o app for publicado)."""
+    with Session(engine) as session:
+        creds = session.exec(
+            select(IntegrationCredential).where(
+                IntegrationCredential.channel == "instagram", IntegrationCredential.status == "connected"
+            )
+        ).all()
+        total = sum(instagram_sync_service.sync_owner(cred.owner_id, session) for cred in creds)
+        if total:
+            logger.info("Instagram: %d mensagem(ns) nova(s) no total (%d conta(s)).", total, len(creds))
+
+
 _scheduler: BackgroundScheduler | None = None
 
 
@@ -218,11 +212,18 @@ def start_scheduler():
         IntervalTrigger(minutes=EMAIL_POLL_MINUTES),
         id="email_poll",
     )
+    _scheduler.add_job(
+        _run_instagram_poll,
+        IntervalTrigger(minutes=INSTAGRAM_POLL_MINUTES),
+        id="instagram_poll",
+    )
     _scheduler.start()
     logger.info(
-        "Agendador iniciado: briefing diário às %dh (UTC), lembretes a cada %d min, watchdog a cada %d min, email a cada %d min.",
+        "Agendador iniciado: briefing diário às %dh (UTC), lembretes a cada %d min, watchdog a cada %d min, "
+        "email a cada %d min, instagram a cada %d min.",
         settings.daily_briefing_hour,
         settings.task_reminder_check_minutes,
         WATCHDOG_CHECK_MINUTES,
         EMAIL_POLL_MINUTES,
+        INSTAGRAM_POLL_MINUTES,
     )
